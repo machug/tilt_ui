@@ -9,6 +9,7 @@ Supports three modes:
 
 import asyncio
 import json
+import logging
 import os
 import random
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from datetime import datetime
 from typing import Callable, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 TILT_COLORS = {
     "a495bb10c5b14b44b5121370f02d74de": "RED",
@@ -187,15 +190,15 @@ class TiltScanner:
 
         # Select mode based on environment
         if os.environ.get("TILT_MOCK", "").lower() in ("true", "1", "yes"):
-            print("Scanner mode: MOCK")
+            logger.info("Scanner mode: MOCK")
             self._scanner = MockScanner()
             self._interval = 5.0  # Mock every 5 seconds
         elif relay_host := os.environ.get("TILT_RELAY"):
-            print(f"Scanner mode: RELAY ({relay_host})")
+            logger.info("Scanner mode: RELAY (%s)", relay_host)
             self._scanner = RelayScanner(relay_host)
             self._interval = 5.0
         else:
-            print("Scanner mode: BLE")
+            logger.info("Scanner mode: BLE")
             self._scanner = BLEScanner()
             self._interval = 1.0  # BLE scans continuously, check every second
 
@@ -211,7 +214,7 @@ class TiltScanner:
                 if reading:
                     await self.on_reading(reading)
             except Exception as e:
-                print(f"Scanner error: {e}")
+                logger.exception("Scanner error: %s", e)
 
             await asyncio.sleep(self._interval)
 

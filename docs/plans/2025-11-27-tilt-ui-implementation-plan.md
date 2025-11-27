@@ -3,6 +3,8 @@
 **Date:** 2025-11-27
 **Design Doc:** [2025-11-27-tilt-ui-design.md](./2025-11-27-tilt-ui-design.md)
 
+**Tooling:** Chrome DevTools MCP is available for live frontend inspection/debugging against the running Svelte app, and the frontend-design plugin skill should be used to keep UI work sharp and intentional.
+
 ## Phase 1: Project Setup
 
 ### Task 1.1: Initialize Python Backend
@@ -332,6 +334,13 @@ DEFAULT_CONFIG = {
 - `GET /api/system/timezones` - read from `/usr/share/zoneinfo`
 - `PUT /api/system/timezone` - update symlink
 
+**Sudoers (non-interactive control):**
+```
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl reboot
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
+pi ALL=(root) NOPASSWD: /usr/bin/timedatectl set-timezone *
+```
+
 **Verification:** Test info endpoint, skip destructive tests until deployment.
 
 ---
@@ -557,6 +566,20 @@ sudo systemctl start tiltui
 ```
 
 **Verification:** Service starts on boot, UI accessible on port 80.
+
+**Sudoers setup (required for system endpoints):**
+
+Install the sudoers file to allow passwordless system control:
+```bash
+cat << 'EOF' | sudo tee /etc/sudoers.d/tiltui
+# Allow tiltui service to manage system without password prompts
+pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl reboot
+pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl poweroff
+pi ALL=(ALL) NOPASSWD: /usr/bin/timedatectl set-timezone *
+EOF
+sudo chmod 440 /etc/sudoers.d/tiltui
+sudo visudo -c  # Validate syntax
+```
 
 ---
 

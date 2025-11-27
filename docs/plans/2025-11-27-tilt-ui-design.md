@@ -216,6 +216,13 @@ AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE
 WantedBy=multi-user.target
 ```
 
+**Sudoers (non-interactive control):**
+```
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl reboot
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
+pi ALL=(root) NOPASSWD: /usr/bin/timedatectl set-timezone *
+```
+
 ## Out of Scope
 
 - Cloud logging (Google Sheets) - replaced by local charts + CSV export
@@ -230,6 +237,8 @@ WantedBy=multi-user.target
 - Has RED Tilt currently in use
 - Can use as BLE relay during development (forward readings to dev machine)
 - Current readings stored at `/home/pi/RED.json`
+
+**Tooling:** Chrome DevTools MCP is available for live frontend inspection, and the frontend-design plugin skill is available to accelerate UI work and keep layouts intentional.
 
 **Scanner modes:**
 1. `TILT_MOCK=true` - Fake scanner with simulated readings (default for dev)

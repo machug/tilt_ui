@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
-from sqlalchemy import ForeignKey, String, Text
+from pydantic import BaseModel, field_validator
+from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -26,10 +26,13 @@ class Tilt(Base):
 
 class Reading(Base):
     __tablename__ = "readings"
+    __table_args__ = (
+        Index("ix_readings_tilt_timestamp", "tilt_id", "timestamp"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
     sg_raw: Mapped[Optional[float]] = mapped_column()
     sg_calibrated: Mapped[Optional[float]] = mapped_column()
     temp_raw: Mapped[Optional[float]] = mapped_column()
@@ -41,9 +44,12 @@ class Reading(Base):
 
 class CalibrationPoint(Base):
     __tablename__ = "calibration_points"
+    __table_args__ = (
+        UniqueConstraint("tilt_id", "type", "raw_value", name="uq_calibration_point"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False)
+    tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(10), nullable=False)  # 'sg' or 'temp'
     raw_value: Mapped[float] = mapped_column(nullable=False)
     actual_value: Mapped[float] = mapped_column(nullable=False)
@@ -133,9 +139,44 @@ class ConfigUpdate(BaseModel):
     smoothing_samples: Optional[int] = None
     id_by_mac: Optional[bool] = None
 
+    @field_validator("temp_units")
+    @classmethod
+    def validate_temp_units(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ("F", "C"):
+            raise ValueError("temp_units must be 'F' or 'C'")
+        return v
+
+    @field_validator("sg_units")
+    @classmethod
+    def validate_sg_units(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ("sg", "plato", "brix"):
+            raise ValueError("sg_units must be 'sg', 'plato', or 'brix'")
+        return v
+
+    @field_validator("local_interval_minutes")
+    @classmethod
+    def validate_interval(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 1 or v > 60):
+            raise ValueError("local_interval_minutes must be between 1 and 60")
+        return v
+
+    @field_validator("min_rssi")
+    @classmethod
+    def validate_rssi(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < -100 or v > 0):
+            raise ValueError("min_rssi must be between -100 and 0")
+        return v
+
+    @field_validator("smoothing_samples")
+    @classmethod
+    def validate_samples(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 1 or v > 20):
+            raise ValueError("smoothing_samples must be between 1 and 20")
+        return v
+
 
 class ConfigResponse(BaseModel):
-    temp_units: str = "F"
+    temp_units: str = "C"
     sg_units: str = "sg"
     local_logging_enabled: bool = True
     local_interval_minutes: int = 15

@@ -5,18 +5,22 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import select, desc
 
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
 from .models import Reading, Tilt
+from .routers import config, system, tilts
+from .cleanup import CleanupService
 from .scanner import TiltReading, TiltScanner
 from .websocket import manager
 
 # Global scanner instance
 scanner: Optional[TiltScanner] = None
 scanner_task: Optional[asyncio.Task] = None
+cleanup_service: Optional[CleanupService] = None
 
 # In-memory cache of latest readings per Tilt
 latest_readings: dict[str, dict] = {}
@@ -73,7 +77,7 @@ async def handle_tilt_reading(reading: TiltReading):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global scanner, scanner_task
+    global scanner, scanner_task, cleanup_service
 
     # Startup
     print("Starting Tilt UI...")
@@ -85,10 +89,16 @@ async def lifespan(app: FastAPI):
     scanner_task = asyncio.create_task(scanner.start())
     print("Scanner started")
 
+    # Start cleanup service (30-day retention, hourly check)
+    cleanup_service = CleanupService(retention_days=30, interval_hours=1)
+    await cleanup_service.start()
+
     yield
 
     # Shutdown
     print("Shutting down Tilt UI...")
+    if cleanup_service:
+        await cleanup_service.stop()
     if scanner:
         await scanner.stop()
     if scanner_task:
@@ -101,6 +111,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Tilt UI", version="0.1.0", lifespan=lifespan)
+
+# Register routers
+app.include_router(tilts.router)
+app.include_router(config.router)
+app.include_router(system.router)
 
 
 @app.get("/api/health")
@@ -128,7 +143,114 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# Mount static files (Svelte build output) - MUST be last
+@app.get("/log.csv")
+async def download_log():
+    """Download all readings as CSV file."""
+    import csv
+    import io
+
+    async def generate_csv():
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Write header
+        writer.writerow([
+            "timestamp", "tilt_id", "color", "beer_name",
+            "sg_raw", "sg_calibrated", "temp_raw", "temp_calibrated", "rssi"
+        ])
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        # Stream readings in batches
+        async with async_session_factory() as session:
+            # Get all tilts for beer_name lookup
+            tilts_result = await session.execute(select(Tilt))
+            tilts_map = {t.id: t for t in tilts_result.scalars()}
+
+            # Get readings ordered by timestamp
+            result = await session.execute(
+                select(Reading).order_by(Reading.timestamp)
+            )
+            for reading in result.scalars():
+                tilt = tilts_map.get(reading.tilt_id)
+                writer.writerow([
+                    reading.timestamp.isoformat() if reading.timestamp else "",
+                    reading.tilt_id,
+                    tilt.color if tilt else "",
+                    tilt.beer_name if tilt else "",
+                    reading.sg_raw,
+                    reading.sg_calibrated,
+                    reading.temp_raw,
+                    reading.temp_calibrated,
+                    reading.rssi
+                ])
+                yield output.getvalue()
+                output.seek(0)
+                output.truncate(0)
+
+    return StreamingResponse(
+        generate_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tilt_readings.csv"}
+    )
+
+
+@app.get("/api/stats")
+async def get_stats():
+    """Get database statistics for the logging page."""
+    async with async_session_factory() as session:
+        # Count total readings
+        from sqlalchemy import func
+        readings_count = await session.execute(
+            select(func.count()).select_from(Reading)
+        )
+        total_readings = int(readings_count.scalar() or 0)
+
+        # Get oldest and newest reading timestamps
+        oldest = await session.execute(
+            select(Reading.timestamp).order_by(Reading.timestamp).limit(1)
+        )
+        oldest_time = oldest.scalar()
+
+        newest = await session.execute(
+            select(Reading.timestamp).order_by(desc(Reading.timestamp)).limit(1)
+        )
+        newest_time = newest.scalar()
+
+        # Estimate size (rough: ~100 bytes per reading)
+        estimated_size_bytes = total_readings * 100
+
+        return {
+            "total_readings": total_readings,
+            "oldest_reading": oldest_time.isoformat() if oldest_time else None,
+            "newest_reading": newest_time.isoformat() if newest_time else None,
+            "estimated_size_bytes": estimated_size_bytes,
+        }
+
+
+# SPA page routes - serve pre-rendered HTML files
 static_dir = Path(__file__).parent / "static"
+
+
+@app.get("/logging")
+async def serve_logging():
+    """Serve the logging page."""
+    return FileResponse(static_dir / "logging.html")
+
+
+@app.get("/calibration")
+async def serve_calibration():
+    """Serve the calibration page."""
+    return FileResponse(static_dir / "calibration.html")
+
+
+@app.get("/system")
+async def serve_system():
+    """Serve the system page."""
+    return FileResponse(static_dir / "system.html")
+
+
+# Mount static files (Svelte build output) - MUST be last
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

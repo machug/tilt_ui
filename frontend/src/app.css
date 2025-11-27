@@ -1,18 +1,144 @@
+/* uPlot chart styles - must be first */
+@import 'uplot/dist/uPlot.min.css';
 @import 'tailwindcss';
 
+/* Import distinctive fonts - Outfit for modern industrial feel */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 :root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --text-primary: #eaeaea;
-  --text-secondary: #a0a0a0;
+  /* Craft Brewery palette - rich dark with warm amber accents */
+  --bg-deep: #08090c;
+  --bg-primary: #0f1115;
+  --bg-card: #161921;
+  --bg-elevated: #1c2029;
+  --bg-hover: #252a36;
+
+  /* Amber/copper brewing tones */
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --amber-glow: rgba(251, 191, 36, 0.12);
+  --amber-glow-strong: rgba(251, 191, 36, 0.25);
+
+  /* Text hierarchy */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  /* Tilt colors - saturated for dark backgrounds */
+  --tilt-red: #f43f5e;
+  --tilt-green: #10b981;
+  --tilt-black: #6b7280;
+  --tilt-purple: #a78bfa;
+  --tilt-orange: #fb923c;
+  --tilt-blue: #60a5fa;
+  --tilt-yellow: #facc15;
+  --tilt-pink: #f472b6;
 }
 
 html {
-  background-color: var(--bg-primary);
+  background-color: var(--bg-deep);
   color: var(--text-primary);
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+/* Monospace for numeric readings */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.02em;
+}
+
+/* Grain texture overlay for depth */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Card hover glow effect */
+.card-glow {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px -10px var(--amber-glow-strong);
+}
+
+/* Amber accent glow for important values */
+.reading-glow {
+  text-shadow: 0 0 30px var(--amber-glow-strong);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--amber-600);
+}
+
+/* Animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* uPlot dark theme overrides */
+.u-wrap {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.u-legend {
+  display: none;
+}
+
+.u-cursor-x,
+.u-cursor-y {
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+
+.u-select {
+  background: rgba(251, 191, 36, 0.1) !important;
 }

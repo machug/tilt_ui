@@ -591,6 +591,97 @@ sudo visudo -c  # Validate syntax
 
 ---
 
+## Phase 9: Hardware Integration Testing
+
+### Task 9.1: Deploy to TiltPi
+
+**Prerequisites:**
+- Existing TiltPi with Red Tilt in active fermentation
+- SSH access to the Pi
+- Backup existing TiltPi config/data
+
+**Steps:**
+1. Clone repo to TiltPi: `git clone <repo> /opt/tiltui`
+2. Run install script: `sudo ./deploy/install.sh`
+3. Verify service starts: `systemctl status tiltui`
+4. Access UI at `http://<tiltpi-ip>/`
+
+**Verification:** UI loads, service running.
+
+---
+
+### Task 9.2: Real BLE Scanner Testing
+
+**Test scenarios:**
+1. **Scanner starts without TILT_MOCK** - verify real BLE scanning activates
+2. **Red Tilt detection** - Tilt appears on dashboard with correct color
+3. **Live data flow** - SG and temp values match existing TiltPi readings
+4. **RSSI accuracy** - signal strength indicator reflects actual proximity
+5. **Multiple readings** - data updates at expected interval (~5s)
+
+**Potential issues:**
+- BLE permissions (may need `setcap` on Python binary)
+- Bluetooth service conflicts with existing TiltPi
+- Scanner loop timing differences
+
+**Verification:** Dashboard shows live Red Tilt data from real fermentation.
+
+---
+
+### Task 9.3: Calibration Validation
+
+**Test with real Tilt:**
+1. Note current raw SG from dashboard
+2. Take hydrometer reading from fermentation
+3. Add calibration point via UI
+4. Verify calibrated value now matches hydrometer
+5. Repeat for temperature if thermometer available
+
+**Verification:** Calibrated readings match reference instruments.
+
+---
+
+### Task 9.4: Data Logging Validation
+
+**Test scenarios:**
+1. Confirm readings accumulate in database at configured interval
+2. Verify CSV export contains real readings
+3. Test 30-day cleanup service works (may need to seed old data)
+4. Check database growth rate matches estimates
+
+**Verification:** Historical data persists and exports correctly.
+
+---
+
+### Task 9.5: Performance on Pi Hardware
+
+**Monitor:**
+- CPU usage during scanning (`htop`)
+- Memory footprint
+- WebSocket latency with multiple browser connections
+- Database query performance with accumulated data
+
+**Potential issues:**
+- ARM-specific Python package compatibility
+- SQLite write performance on SD card
+- BLE scanner CPU overhead
+
+**Verification:** System runs stable for extended period (24h+).
+
+---
+
+### Task 9.6: Side-by-side Comparison
+
+**Compare with existing TiltPi:**
+- Run both UIs simultaneously (different ports)
+- Verify readings match within tolerance
+- Compare historical data visualization
+- Test calibration produces same results
+
+**Verification:** New UI functionally equivalent or better than original TiltPi.
+
+---
+
 ## Summary
 
 | Phase | Tasks | Estimated Complexity |
@@ -603,8 +694,9 @@ sudo visudo -c  # Validate syntax
 | 6. Settings Pages | 3 | Medium |
 | 7. Logging & Export | 2 | Low |
 | 8. Polish & Deploy | 3 | Low |
+| 9. Hardware Testing | 6 | Medium |
 
-**Total: 22 tasks**
+**Total: 28 tasks**
 
 ## Development Order Recommendation
 
@@ -616,3 +708,4 @@ sudo visudo -c  # Validate syntax
 6. Phase 6 (settings pages) - configuration UI
 7. Phase 7 (logging) - persistence
 8. Phase 8 (polish) - deployment ready
+9. Phase 9 (hardware) - real Tilt integration testing

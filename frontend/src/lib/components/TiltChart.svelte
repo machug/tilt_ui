@@ -55,7 +55,7 @@
 	const GRID_COLOR = 'rgba(255, 255, 255, 0.04)';
 	const CYAN = '#22d3ee'; // Ambient temp color
 
-	function getChartOptions(width: number, celsius: boolean): uPlot.Options {
+	function getChartOptions(width: number, celsius: boolean, tz: string): uPlot.Options {
 		const sgColor = AMBER;
 		const tempColor = tiltColorMap[tiltColor] || TEXT_SECONDARY;
 
@@ -111,13 +111,13 @@
 								return d.toLocaleTimeString([], {
 									hour: '2-digit',
 									minute: '2-digit',
-									timeZone: systemTimezone
+									timeZone: tz
 								});
 							}
 							return d.toLocaleDateString([], {
 								month: 'short',
 								day: 'numeric',
-								timeZone: systemTimezone
+								timeZone: tz
 							});
 						})
 				},
@@ -370,7 +370,7 @@
 		if (!chartContainer || readings.length === 0) return;
 
 		const data = processData(readings, ambientReadings, useCelsius);
-		const opts = getChartOptions(chartContainer.clientWidth, useCelsius);
+		const opts = getChartOptions(chartContainer.clientWidth, useCelsius, systemTimezone);
 
 		if (chart) {
 			chart.destroy();

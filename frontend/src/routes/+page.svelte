@@ -307,8 +307,8 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: 1rem;
-		background: var(--bg-card);
-		border: 1px solid var(--bg-hover);
+		background: var(--bg-surface);
+		border: 1px solid var(--border-subtle);
 		margin-bottom: 1.5rem;
 		animation: float 3s ease-in-out infinite;
 	}
@@ -363,9 +363,9 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.75rem 1rem;
-		background: var(--bg-card);
-		border: 1px solid var(--bg-hover);
-		border-radius: 0.5rem;
+		background: var(--bg-surface);
+		border: 1px solid var(--border-subtle);
+		border-radius: 0.375rem;
 		color: var(--text-muted);
 		font-size: 0.75rem;
 		max-width: 24rem;

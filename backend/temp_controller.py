@@ -289,8 +289,9 @@ async def temperature_control_loop() -> None:
                         continue
 
                 # Calculate thresholds for logging
-                heat_on_threshold = target_temp - hysteresis
-                heat_off_threshold = target_temp + hysteresis
+                # Round thresholds to 1 decimal to match Tilt resolution and avoid floating-point edge cases
+                heat_on_threshold = round(target_temp - hysteresis, 1)
+                heat_off_threshold = round(target_temp + hysteresis, 1)
 
                 # Log control decision info at DEBUG level for diagnostics
                 logger.debug(
@@ -300,27 +301,28 @@ async def temperature_control_loop() -> None:
                 )
 
                 # Automatic control logic with hysteresis
-                if wort_temp < heat_on_threshold:
+                # Use <= and >= to handle edge cases where temp is exactly at threshold
+                if wort_temp <= heat_on_threshold:
                     # Too cold - turn on heater
                     if _heater_state != "on":
-                        logger.info(f"Wort temp {wort_temp:.1f}F below target {target_temp:.1f}F (hysteresis={hysteresis:.2f}), turning heater ON")
+                        logger.info(f"Wort temp {wort_temp:.1f}F at/below target {target_temp:.1f}F (hysteresis={hysteresis:.2f}), turning heater ON")
                         await set_heater_state(
                             ha_client, heater_entity, "on", db,
                             wort_temp, ambient_temp, target_temp, tilt_id
                         )
                     else:
-                        logger.debug(f"Heater already ON, wort={wort_temp:.1f}F < on_threshold={heat_on_threshold:.1f}F")
+                        logger.debug(f"Heater already ON, wort={wort_temp:.1f}F <= on_threshold={heat_on_threshold:.1f}F")
 
-                elif wort_temp > heat_off_threshold:
+                elif wort_temp >= heat_off_threshold:
                     # Too warm - turn off heater
                     if _heater_state != "off":
-                        logger.info(f"Wort temp {wort_temp:.1f}F above target {target_temp:.1f}F (hysteresis={hysteresis:.2f}), turning heater OFF")
+                        logger.info(f"Wort temp {wort_temp:.1f}F at/above target {target_temp:.1f}F (hysteresis={hysteresis:.2f}), turning heater OFF")
                         await set_heater_state(
                             ha_client, heater_entity, "off", db,
                             wort_temp, ambient_temp, target_temp, tilt_id
                         )
                     else:
-                        logger.debug(f"Heater already OFF, wort={wort_temp:.1f}F > off_threshold={heat_off_threshold:.1f}F")
+                        logger.debug(f"Heater already OFF, wort={wort_temp:.1f}F >= off_threshold={heat_off_threshold:.1f}F")
 
                 else:
                     # Within hysteresis band - maintain current state

@@ -72,11 +72,11 @@
 		return formatTemp(temp);
 	}
 
-	function getSignalStrength(rssi: number): { bars: number; color: string } {
-		if (rssi >= -50) return { bars: 4, color: 'var(--positive)' };
-		if (rssi >= -60) return { bars: 3, color: 'var(--positive)' };
-		if (rssi >= -70) return { bars: 2, color: 'var(--warning)' };
-		return { bars: 1, color: 'var(--negative)' };
+	function getSignalStrength(rssi: number): { bars: number; color: string; label: string } {
+		if (rssi >= -50) return { bars: 4, color: 'var(--positive)', label: 'Excellent' };
+		if (rssi >= -60) return { bars: 3, color: 'var(--positive)', label: 'Good' };
+		if (rssi >= -70) return { bars: 2, color: 'var(--warning)', label: 'Fair' };
+		return { bars: 1, color: 'var(--negative)', label: 'Weak' };
 	}
 
 	function timeSince(isoString: string): string {
@@ -148,7 +148,7 @@
 			</div>
 
 			<!-- Signal indicator -->
-			<div class="flex flex-col items-end gap-1">
+			<div class="flex flex-col items-end gap-1" title="{signal.label} signal ({tilt.rssi} dBm)">
 				<div class="flex items-end gap-0.5">
 					{#each Array(4) as _, i}
 						<div

@@ -48,9 +48,9 @@
 		PINK: '#f472b6'
 	};
 
-	// Theme colors
-	const AMBER = '#fbbf24';
-	const AMBER_GLOW = 'rgba(251, 191, 36, 0.3)';
+	// Theme colors - using tilt-yellow instead of amber
+	const SG_COLOR = '#facc15'; // tilt-yellow
+	const SG_GLOW = 'rgba(250, 204, 21, 0.3)'; // tilt-yellow with transparency
 	const TEXT_MUTED = '#71717a';
 	const TEXT_SECONDARY = '#a1a1aa';
 	const GRID_COLOR = 'rgba(255, 255, 255, 0.04)';
@@ -91,7 +91,7 @@
 	}
 
 	function getChartOptions(width: number, celsius: boolean, tz: string): uPlot.Options {
-		const sgColor = AMBER;
+		const sgColor = SG_COLOR;
 		const tempColor = tiltColorMap[tiltColor] || TEXT_SECONDARY;
 
 		return {
@@ -175,7 +175,7 @@
 					width: 2,
 					fill: (u: uPlot, idx: number) => {
 						const gradient = u.ctx.createLinearGradient(0, u.bbox.top, 0, u.bbox.top + u.bbox.height);
-						gradient.addColorStop(0, AMBER_GLOW);
+						gradient.addColorStop(0, SG_GLOW);
 						gradient.addColorStop(1, 'transparent');
 						return gradient;
 					},

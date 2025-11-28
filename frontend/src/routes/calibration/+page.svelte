@@ -581,7 +581,7 @@
 		width: 100%;
 		padding: 0.5rem 0.75rem;
 		font-size: 0.8125rem;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 		color: var(--text-primary);
 		background: var(--bg-elevated);
 		border: 1px solid var(--bg-hover);

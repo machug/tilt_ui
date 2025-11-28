@@ -202,11 +202,12 @@
 		{/if}
 	</div>
 {:else}
-	<div class="tilt-grid">
+	<div class="tilt-grid" class:single-tilt={tiltsList.length === 1}>
 		{#each tiltsList as tilt (tilt.id)}
 			<TiltCard
 				{tilt}
 				expanded={expandedTiltId === tilt.id}
+				wide={tiltsList.length === 1}
 				onToggleExpand={() => toggleExpand(tilt.id)}
 			/>
 		{/each}
@@ -288,6 +289,11 @@
 		.tilt-grid {
 			grid-template-columns: repeat(4, 1fr);
 		}
+	}
+
+	.tilt-grid.single-tilt {
+		display: flex;
+		justify-content: center;
 	}
 
 	.empty-state {

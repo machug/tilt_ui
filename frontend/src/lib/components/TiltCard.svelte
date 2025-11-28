@@ -7,10 +7,11 @@
 	interface Props {
 		tilt: TiltReading;
 		expanded?: boolean;
+		wide?: boolean;
 		onToggleExpand?: () => void;
 	}
 
-	let { tilt, expanded = false, onToggleExpand }: Props = $props();
+	let { tilt, expanded = false, wide = false, onToggleExpand }: Props = $props();
 
 	// Beer name editing state
 	let isEditing = $state(false);
@@ -98,6 +99,7 @@
 <div
 	class="card rounded-lg overflow-hidden animate-fade-in"
 	class:expanded
+	class:wide
 	style="background: var(--bg-surface); border: 1px solid var(--border-subtle);"
 >
 	<!-- Accent bar -->
@@ -260,6 +262,20 @@
 		.expanded {
 			grid-column: span 1;
 		}
+	}
+
+	.wide {
+		max-width: 28rem;
+	}
+
+	@media (min-width: 768px) {
+		.wide {
+			max-width: 36rem;
+		}
+	}
+
+	.wide .text-3xl {
+		font-size: 2.5rem;
 	}
 
 	.chart-section {

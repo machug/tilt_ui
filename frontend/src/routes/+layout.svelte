@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount, onDestroy } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import { tiltsState, startHeaterPolling, stopHeaterPolling } from '$lib/stores/tilts.svelte';
 	import { loadConfig, configState } from '$lib/stores/config.svelte';
@@ -135,7 +136,7 @@
 
 		<!-- Mobile menu -->
 		{#if mobileMenuOpen}
-			<div class="md:hidden" style="background: var(--bg-primary); border-top: 1px solid var(--bg-hover);">
+			<div class="md:hidden" style="background: var(--bg-primary); border-top: 1px solid var(--bg-hover);" transition:slide={{ duration: 150 }}>
 				<div class="px-3 py-3 space-y-1">
 					{#each navLinks as link}
 						{@const active = isActive(link.href, $page.url.pathname)}

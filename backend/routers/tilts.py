@@ -1,6 +1,6 @@
 """Tilt hydrometer API endpoints."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -94,7 +94,7 @@ async def get_readings(
 
     # Apply time filters
     if hours:
-        start = datetime.utcnow() - timedelta(hours=hours)
+        start = datetime.now(timezone.utc) - timedelta(hours=hours)
     if start:
         query = query.where(Reading.timestamp >= start)
     if end:

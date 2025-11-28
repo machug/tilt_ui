@@ -1,7 +1,7 @@
 """Ambient temperature/humidity API endpoints."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, desc
@@ -54,7 +54,7 @@ async def get_current_ambient():
         return {
             "temperature": temperature,
             "humidity": humidity,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -64,7 +64,7 @@ async def get_ambient_history(
     db: AsyncSession = Depends(get_db)
 ):
     """Get historical ambient readings."""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     result = await db.execute(
         select(AmbientReading)

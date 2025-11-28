@@ -8,7 +8,7 @@ Safety: Destructive operations (reboot/shutdown) require:
 import os
 import socket
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -223,7 +223,7 @@ async def trigger_cleanup(cleanup: CleanupRequest, request: Request):
         from ..database import async_session_factory
         from ..models import Reading
 
-        cutoff = datetime.utcnow() - timedelta(days=cleanup.retention_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=cleanup.retention_days)
         async with async_session_factory() as session:
             result = await session.execute(
                 select(func.count()).select_from(Reading).where(Reading.timestamp < cutoff)

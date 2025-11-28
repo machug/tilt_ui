@@ -1,7 +1,7 @@
 """Temperature control API endpoints."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -73,7 +73,7 @@ async def get_events(
     db: AsyncSession = Depends(get_db)
 ):
     """Get temperature control event history."""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     result = await db.execute(
         select(ControlEvent)

@@ -21,6 +21,34 @@ _heater_state: Optional[str] = None  # "on", "off", or None (unknown)
 _override_state: Optional[str] = None  # Manual override: "on", "off", or None (auto)
 _override_until: Optional[datetime] = None  # When override expires
 
+# Track HA config to detect changes
+_last_ha_url: Optional[str] = None
+_last_ha_token: Optional[str] = None
+
+# Event to trigger immediate control check (for override)
+_wake_event: asyncio.Event | None = None
+
+
+async def _wait_or_wake(seconds: float) -> None:
+    """Sleep for specified seconds, but wake early if _wake_event is set."""
+    global _wake_event
+    if _wake_event is None:
+        await asyncio.sleep(seconds)
+        return
+
+    try:
+        await asyncio.wait_for(_wake_event.wait(), timeout=seconds)
+        _wake_event.clear()  # Reset for next wait
+    except asyncio.TimeoutError:
+        pass  # Normal timeout, continue
+
+
+def _trigger_immediate_check() -> None:
+    """Wake the control loop to run immediately."""
+    global _wake_event
+    if _wake_event is not None:
+        _wake_event.set()
+
 
 def get_latest_tilt_temp() -> Optional[float]:
     """Get the latest wort temperature from any active Tilt.
@@ -145,7 +173,9 @@ async def set_heater_state(ha_client, entity_id: str, state: str, db, wort_temp:
 
 async def temperature_control_loop() -> None:
     """Main temperature control loop."""
-    global _heater_state, _override_state, _override_until
+    global _heater_state, _override_state, _override_until, _last_ha_url, _last_ha_token, _wake_event
+
+    _wake_event = asyncio.Event()
 
     while True:
         try:
@@ -154,37 +184,56 @@ async def temperature_control_loop() -> None:
                 temp_control_enabled = await get_config_value(db, "temp_control_enabled")
 
                 if not temp_control_enabled:
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    # Clear override when control is disabled
+                    if _override_state is not None:
+                        logger.info("Temperature control disabled, clearing override")
+                        _override_state = None
+                        _override_until = None
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
 
                 # Check if HA is enabled
                 ha_enabled = await get_config_value(db, "ha_enabled")
                 if not ha_enabled:
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    # Clear override when HA is disabled
+                    if _override_state is not None:
+                        logger.info("Home Assistant disabled, clearing override")
+                        _override_state = None
+                        _override_until = None
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
 
-                # Get HA client
+                # Get HA client - reinitialize if config changed
                 ha_url = await get_config_value(db, "ha_url")
                 ha_token = await get_config_value(db, "ha_token")
 
                 if not ha_url or not ha_token:
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
+
+                # Reinitialize HA client if URL or token changed
+                if ha_url != _last_ha_url or ha_token != _last_ha_token:
+                    logger.info("HA config changed, reinitializing client")
+                    init_ha_client(ha_url, ha_token)
+                    _last_ha_url = ha_url
+                    _last_ha_token = ha_token
 
                 ha_client = get_ha_client()
                 if not ha_client:
                     init_ha_client(ha_url, ha_token)
+                    _last_ha_url = ha_url
+                    _last_ha_token = ha_token
                     ha_client = get_ha_client()
 
                 if not ha_client:
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
 
                 # Get heater entity
                 heater_entity = await get_config_value(db, "ha_heater_entity_id")
                 if not heater_entity:
                     logger.debug("No heater entity configured")
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
 
                 # Get control parameters
@@ -195,7 +244,7 @@ async def temperature_control_loop() -> None:
                 wort_temp = get_latest_tilt_temp()
                 if wort_temp is None:
                     logger.debug("No Tilt temperature available")
-                    await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                    await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                     continue
 
                 tilt_id = get_latest_tilt_id()
@@ -216,7 +265,7 @@ async def temperature_control_loop() -> None:
                                 ha_client, heater_entity, desired_state, db,
                                 wort_temp, ambient_temp, target_temp, tilt_id
                             )
-                        await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+                        await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
                         continue
 
                 # Automatic control logic with hysteresis
@@ -243,7 +292,7 @@ async def temperature_control_loop() -> None:
         except Exception as e:
             logger.error(f"Temperature control error: {e}", exc_info=True)
 
-        await asyncio.sleep(CONTROL_INTERVAL_SECONDS)
+        await _wait_or_wake(CONTROL_INTERVAL_SECONDS)
 
 
 def get_control_status() -> dict:
@@ -275,6 +324,7 @@ def set_manual_override(state: Optional[str], duration_minutes: int = 60) -> boo
         _override_state = None
         _override_until = None
         logger.info("Manual override cancelled, returning to auto mode")
+        _trigger_immediate_check()  # Wake loop to apply auto control immediately
         return True
 
     if state not in ("on", "off"):
@@ -283,6 +333,7 @@ def set_manual_override(state: Optional[str], duration_minutes: int = 60) -> boo
     _override_state = state
     _override_until = datetime.now(timezone.utc) + timedelta(minutes=duration_minutes) if duration_minutes > 0 else None
     logger.info(f"Manual override set: heater {state} for {duration_minutes} minutes")
+    _trigger_immediate_check()  # Wake loop to apply override immediately
     return True
 
 

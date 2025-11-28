@@ -14,7 +14,7 @@ import logging
 import os
 import random
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -81,7 +81,7 @@ class MockScanner:
             temp_f=round(self.base_temp, 1),
             sg=round(self.base_sg, 4),
             rssi=random.randint(-80, -50),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
 
@@ -106,7 +106,7 @@ class RelayScanner:
                         temp_f=float(data.get("Temp", 0)),
                         sg=float(data.get("SG", 1.000)),
                         rssi=int(data.get("rssi", -100)),
-                        timestamp=datetime.utcnow(),
+                        timestamp=datetime.now(timezone.utc),
                     )
             except Exception:
                 continue
@@ -153,7 +153,7 @@ class FileScanner:
                     temp_f=float(data.get("Temp", 0)),
                     sg=float(data.get("SG", 1.000)),
                     rssi=int(data.get("rssi", -100)),
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                 )
             except Exception as e:
                 logger.debug("Error reading %s: %s", json_file, e)
@@ -213,7 +213,7 @@ class BLEScanner:
                 temp_f=temp_f,
                 sg=sg,
                 rssi=advertisement_data.rssi,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
             print(f"BLE: Detected {color} Tilt - {temp_f:.1f}F, SG {sg:.4f}")
 

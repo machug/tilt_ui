@@ -6,7 +6,7 @@ Default: 30 days for normal readings.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select
 
@@ -21,7 +21,7 @@ async def cleanup_old_readings(retention_days: int = 30) -> int:
 
     Returns the number of deleted rows.
     """
-    cutoff = datetime.utcnow() - timedelta(days=retention_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
     async with async_session_factory() as session:
         # Get count first for logging

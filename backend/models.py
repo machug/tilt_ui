@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
@@ -32,7 +32,7 @@ class Reading(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False, index=True)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
     sg_raw: Mapped[Optional[float]] = mapped_column()
     sg_calibrated: Mapped[Optional[float]] = mapped_column()
     temp_raw: Mapped[Optional[float]] = mapped_column()
@@ -65,7 +65,7 @@ class AmbientReading(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
     temperature: Mapped[Optional[float]] = mapped_column()
     humidity: Mapped[Optional[float]] = mapped_column()
     entity_id: Mapped[Optional[str]] = mapped_column(String(100))

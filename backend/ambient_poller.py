@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .database import async_session_factory
 from .models import AmbientReading
@@ -87,7 +87,7 @@ async def poll_ambient() -> None:
                         "type": "ambient",
                         "temperature": temperature,
                         "humidity": humidity,
-                        "timestamp": datetime.utcnow().isoformat()
+                        "timestamp": datetime.now(timezone.utc).isoformat()
                     })
 
                     logger.debug(f"Ambient: temp={temperature}, humidity={humidity}")

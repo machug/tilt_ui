@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -46,7 +46,7 @@ async def handle_tilt_reading(reading: TiltReading):
             )
             session.add(tilt)
 
-        tilt.last_seen = datetime.utcnow()
+        tilt.last_seen = datetime.now(timezone.utc)
         tilt.mac = reading.mac
 
         # Apply calibration
@@ -76,7 +76,7 @@ async def handle_tilt_reading(reading: TiltReading):
             "temp": temp_calibrated,
             "temp_raw": reading.temp_f,
             "rssi": reading.rssi,
-            "last_seen": datetime.utcnow().isoformat(),
+            "last_seen": datetime.now(timezone.utc).isoformat(),
         }
 
         # Update in-memory cache

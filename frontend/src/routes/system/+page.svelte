@@ -52,6 +52,27 @@
 	let haError = $state<string | null>(null);
 	let haSuccess = $state(false);
 
+	// Temperature Control state
+	interface ControlStatus {
+		enabled: boolean;
+		heater_state: string | null;
+		override_active: boolean;
+		override_state: string | null;
+		override_until: string | null;
+		target_temp: number | null;
+		hysteresis: number | null;
+		wort_temp: number | null;
+		heater_entity: string | null;
+	}
+	let controlStatus = $state<ControlStatus | null>(null);
+	let tempControlEnabled = $state(false);
+	let tempTarget = $state(68.0);
+	let tempHysteresis = $state(1.0);
+	let controlSaving = $state(false);
+	let controlError = $state<string | null>(null);
+	let controlSuccess = $state(false);
+	let overrideLoading = $state(false);
+
 	async function loadSystemInfo() {
 		try {
 			const response = await fetch('/api/system/info');
@@ -107,6 +128,10 @@
 		haAmbientHumidityEntityId = configState.config.ha_ambient_humidity_entity_id;
 		haWeatherEntityId = configState.config.ha_weather_entity_id;
 		haHeaterEntityId = configState.config.ha_heater_entity_id;
+		// Temperature Control
+		tempControlEnabled = configState.config.temp_control_enabled;
+		tempTarget = configState.config.temp_target;
+		tempHysteresis = configState.config.temp_hysteresis;
 	}
 
 	async function saveConfig() {
@@ -156,6 +181,58 @@
 			}
 		} finally {
 			haSaving = false;
+		}
+	}
+
+	async function loadControlStatus() {
+		try {
+			const response = await fetch('/api/control/status');
+			if (response.ok) {
+				controlStatus = await response.json();
+			}
+		} catch (e) {
+			console.error('Failed to load control status:', e);
+		}
+	}
+
+	async function saveControlConfig() {
+		controlSaving = true;
+		controlError = null;
+		controlSuccess = false;
+		try {
+			const result = await updateConfig({
+				temp_control_enabled: tempControlEnabled,
+				temp_target: tempTarget,
+				temp_hysteresis: tempHysteresis
+			});
+			if (result.success) {
+				controlSuccess = true;
+				setTimeout(() => (controlSuccess = false), 3000);
+				// Reload control status after saving
+				await loadControlStatus();
+			} else {
+				controlError = result.error || 'Failed to save settings';
+			}
+		} finally {
+			controlSaving = false;
+		}
+	}
+
+	async function setOverride(state: string | null) {
+		overrideLoading = true;
+		try {
+			const response = await fetch('/api/control/override', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ state, duration_minutes: 60 })
+			});
+			if (response.ok) {
+				await loadControlStatus();
+			}
+		} catch (e) {
+			console.error('Failed to set override:', e);
+		} finally {
+			overrideLoading = false;
 		}
 	}
 
@@ -317,7 +394,8 @@
 			loadSystemInfo(),
 			loadStorageStats(),
 			loadTimezones(),
-			loadHAStatus()
+			loadHAStatus(),
+			loadControlStatus()
 		]);
 		syncConfigFromStore();
 		loading = false;
@@ -701,6 +779,153 @@
 					{/if}
 				</div>
 			</div>
+
+			<!-- Temperature Control -->
+			{#if haEnabled && haHeaterEntityId}
+				<div class="card">
+					<div class="card-header">
+						<h2 class="card-title">Temperature Control</h2>
+					</div>
+					<div class="card-body">
+						<!-- Enable/Disable Control -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Enable Temperature Control</span>
+								<span class="setting-description">Automatically control heater based on wort temp</span>
+							</div>
+							<button
+								type="button"
+								class="toggle"
+								class:active={tempControlEnabled}
+								onclick={() => (tempControlEnabled = !tempControlEnabled)}
+								aria-pressed={tempControlEnabled}
+								aria-label="Toggle temperature control"
+							>
+								<span class="toggle-slider"></span>
+							</button>
+						</div>
+
+						{#if tempControlEnabled}
+							<!-- Control Status -->
+							{#if controlStatus}
+								<div class="control-status">
+									<div class="status-item">
+										<span class="status-label">Heater</span>
+										<span class="status-value" class:heater-on={controlStatus.heater_state === 'on'}>
+											{controlStatus.heater_state === 'on' ? 'ON' : controlStatus.heater_state === 'off' ? 'OFF' : '—'}
+										</span>
+									</div>
+									<div class="status-item">
+										<span class="status-label">Wort Temp</span>
+										<span class="status-value">
+											{controlStatus.wort_temp !== null ? `${controlStatus.wort_temp.toFixed(1)}°F` : '—'}
+										</span>
+									</div>
+									{#if controlStatus.override_active}
+										<div class="status-item override">
+											<span class="status-label">Override</span>
+											<span class="status-value">{controlStatus.override_state?.toUpperCase()}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							<!-- Target Temperature -->
+							<div class="setting-row">
+								<div class="setting-info">
+									<span class="setting-label">Target Temperature</span>
+									<span class="setting-description">Desired fermentation temperature (°F)</span>
+								</div>
+								<input
+									type="number"
+									bind:value={tempTarget}
+									min="32"
+									max="100"
+									step="0.5"
+									class="input-field input-number"
+								/>
+							</div>
+
+							<!-- Hysteresis -->
+							<div class="setting-row">
+								<div class="setting-info">
+									<span class="setting-label">Hysteresis</span>
+									<span class="setting-description">± tolerance before triggering (°F)</span>
+								</div>
+								<input
+									type="number"
+									bind:value={tempHysteresis}
+									min="0.5"
+									max="10"
+									step="0.5"
+									class="input-field input-number"
+								/>
+							</div>
+
+							<!-- Manual Override Buttons -->
+							<div class="setting-row">
+								<div class="setting-info">
+									<span class="setting-label">Manual Override</span>
+									<span class="setting-description">Temporarily override automatic control (1 hour)</span>
+								</div>
+								<div class="override-buttons">
+									<button
+										type="button"
+										class="btn-override"
+										class:active={controlStatus?.override_state === 'on'}
+										onclick={() => setOverride('on')}
+										disabled={overrideLoading}
+									>
+										Force ON
+									</button>
+									<button
+										type="button"
+										class="btn-override"
+										class:active={controlStatus?.override_state === 'off'}
+										onclick={() => setOverride('off')}
+										disabled={overrideLoading}
+									>
+										Force OFF
+									</button>
+									{#if controlStatus?.override_active}
+										<button
+											type="button"
+											class="btn-override btn-cancel"
+											onclick={() => setOverride(null)}
+											disabled={overrideLoading}
+										>
+											Cancel
+										</button>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Save Button -->
+							<div class="mt-4 config-actions">
+								<button
+									type="button"
+									class="btn-primary"
+									onclick={saveControlConfig}
+									disabled={controlSaving}
+								>
+									{#if controlSaving}
+										<span class="loading-dot"></span>
+										Saving...
+									{:else}
+										Save Control Settings
+									{/if}
+								</button>
+								{#if controlError}
+									<p class="config-error">{controlError}</p>
+								{/if}
+								{#if controlSuccess}
+									<p class="config-success">Settings saved</p>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
 
 			<!-- Storage & Cleanup -->
 			<div class="card">
@@ -1385,6 +1610,92 @@
 
 	.test-result.success {
 		color: var(--tilt-green);
+	}
+
+	/* Temperature Control */
+	.control-status {
+		display: flex;
+		gap: 1.5rem;
+		padding: 0.75rem 1rem;
+		background: var(--bg-elevated);
+		border-radius: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.status-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.status-label {
+		font-size: 0.625rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-muted);
+	}
+
+	.status-value {
+		font-size: 1rem;
+		font-weight: 600;
+		font-family: 'JetBrains Mono', monospace;
+		color: var(--text-primary);
+	}
+
+	.status-value.heater-on {
+		color: var(--amber-400);
+	}
+
+	.status-item.override .status-value {
+		color: var(--tilt-blue);
+	}
+
+	.input-number {
+		width: 6rem;
+		text-align: right;
+	}
+
+	.override-buttons {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.btn-override {
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		border-radius: 0.375rem;
+		background: var(--bg-elevated);
+		border: 1px solid var(--bg-hover);
+		color: var(--text-secondary);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.btn-override:hover:not(:disabled) {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.btn-override.active {
+		background: var(--amber-400);
+		border-color: var(--amber-400);
+		color: var(--bg-deep);
+	}
+
+	.btn-override.btn-cancel {
+		border-color: var(--tilt-red);
+		color: var(--tilt-red);
+	}
+
+	.btn-override.btn-cancel:hover:not(:disabled) {
+		background: rgba(244, 63, 94, 0.1);
+	}
+
+	.btn-override:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	@media (max-width: 640px) {

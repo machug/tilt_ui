@@ -71,6 +71,22 @@ class AmbientReading(Base):
     entity_id: Mapped[Optional[str]] = mapped_column(String(100))
 
 
+class ControlEvent(Base):
+    """Temperature control events (heater on/off, cooler on/off)."""
+    __tablename__ = "control_events"
+    __table_args__ = (
+        Index("ix_control_timestamp", "timestamp"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
+    tilt_id: Mapped[Optional[str]] = mapped_column(String(36))
+    action: Mapped[str] = mapped_column(String(20))  # heat_on, heat_off, cool_on, cool_off
+    wort_temp: Mapped[Optional[float]] = mapped_column()
+    ambient_temp: Mapped[Optional[float]] = mapped_column()
+    target_temp: Mapped[Optional[float]] = mapped_column()
+
+
 class Config(Base):
     __tablename__ = "config"
 
@@ -132,6 +148,19 @@ class AmbientReadingResponse(BaseModel):
     timestamp: datetime
     temperature: Optional[float]
     humidity: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+
+class ControlEventResponse(BaseModel):
+    id: int
+    timestamp: datetime
+    tilt_id: Optional[str]
+    action: str
+    wort_temp: Optional[float]
+    ambient_temp: Optional[float]
+    target_temp: Optional[float]
 
     class Config:
         from_attributes = True

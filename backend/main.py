@@ -16,8 +16,9 @@ from sqlalchemy import select, desc
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
 from .models import Reading, Tilt
-from .routers import ambient, config, ha, system, tilts
+from .routers import ambient, config, control, ha, system, tilts
 from .ambient_poller import start_ambient_poller, stop_ambient_poller
+from .temp_controller import start_temp_controller, stop_temp_controller
 from .cleanup import CleanupService
 from .scanner import TiltReading, TiltScanner
 from .services.calibration import calibration_service
@@ -108,10 +109,15 @@ async def lifespan(app: FastAPI):
     start_ambient_poller()
     print("Ambient poller started")
 
+    # Start temperature controller for HA-based temperature control
+    start_temp_controller()
+    print("Temperature controller started")
+
     yield
 
     # Shutdown
     print("Shutting down Tilt UI...")
+    stop_temp_controller()
     stop_ambient_poller()
     if cleanup_service:
         await cleanup_service.stop()
@@ -135,6 +141,7 @@ app.include_router(config.router)
 app.include_router(system.router)
 app.include_router(ambient.router)
 app.include_router(ha.router)
+app.include_router(control.router)
 
 
 @app.get("/api/health")

@@ -30,6 +30,21 @@ class ConnectionManager:
         for conn in disconnected:
             self.disconnect(conn)
 
+    async def broadcast_json(self, data: dict) -> None:
+        """Broadcast JSON data to all connected clients."""
+        import json
+        message = json.dumps(data)
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                disconnected.append(connection)
+
+        # Clean up disconnected clients
+        for conn in disconnected:
+            self.disconnect(conn)
+
     @property
     def connection_count(self) -> int:
         return len(self.active_connections)

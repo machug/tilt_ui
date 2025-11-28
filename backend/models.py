@@ -57,6 +57,20 @@ class CalibrationPoint(Base):
     tilt: Mapped["Tilt"] = relationship(back_populates="calibration_points")
 
 
+class AmbientReading(Base):
+    """Ambient temperature/humidity readings from Home Assistant sensors."""
+    __tablename__ = "ambient_readings"
+    __table_args__ = (
+        Index("ix_ambient_timestamp", "timestamp"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    temperature: Mapped[Optional[float]] = mapped_column()
+    humidity: Mapped[Optional[float]] = mapped_column()
+    entity_id: Mapped[Optional[str]] = mapped_column(String(100))
+
+
 class Config(Base):
     __tablename__ = "config"
 
@@ -113,6 +127,16 @@ class ReadingResponse(BaseModel):
         from_attributes = True
 
 
+class AmbientReadingResponse(BaseModel):
+    id: int
+    timestamp: datetime
+    temperature: Optional[float]
+    humidity: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+
 class CalibrationPointCreate(BaseModel):
     type: str  # 'sg' or 'temp'
     raw_value: float
@@ -138,6 +162,19 @@ class ConfigUpdate(BaseModel):
     smoothing_enabled: Optional[bool] = None
     smoothing_samples: Optional[int] = None
     id_by_mac: Optional[bool] = None
+    # Home Assistant settings
+    ha_enabled: Optional[bool] = None
+    ha_url: Optional[str] = None
+    ha_token: Optional[str] = None
+    ha_ambient_temp_entity_id: Optional[str] = None
+    ha_ambient_humidity_entity_id: Optional[str] = None
+    # Temperature control
+    temp_control_enabled: Optional[bool] = None
+    temp_target: Optional[float] = None
+    temp_hysteresis: Optional[float] = None
+    ha_heater_entity_id: Optional[str] = None
+    # Weather
+    ha_weather_entity_id: Optional[str] = None
 
     @field_validator("temp_units")
     @classmethod
@@ -174,6 +211,27 @@ class ConfigUpdate(BaseModel):
             raise ValueError("smoothing_samples must be between 1 and 20")
         return v
 
+    @field_validator("ha_url")
+    @classmethod
+    def validate_ha_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v and not v.startswith(("http://", "https://")):
+            raise ValueError("ha_url must start with http:// or https://")
+        return v.rstrip("/") if v else v
+
+    @field_validator("temp_target")
+    @classmethod
+    def validate_temp_target(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and (v < 32 or v > 100):
+            raise ValueError("temp_target must be between 32 and 100 (Fahrenheit)")
+        return v
+
+    @field_validator("temp_hysteresis")
+    @classmethod
+    def validate_temp_hysteresis(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and (v < 0.5 or v > 10):
+            raise ValueError("temp_hysteresis must be between 0.5 and 10")
+        return v
+
 
 class ConfigResponse(BaseModel):
     temp_units: str = "C"
@@ -184,3 +242,16 @@ class ConfigResponse(BaseModel):
     smoothing_enabled: bool = False
     smoothing_samples: int = 5
     id_by_mac: bool = False
+    # Home Assistant settings
+    ha_enabled: bool = False
+    ha_url: str = ""
+    ha_token: str = ""
+    ha_ambient_temp_entity_id: str = ""
+    ha_ambient_humidity_entity_id: str = ""
+    # Temperature control
+    temp_control_enabled: bool = False
+    temp_target: float = 68.0
+    temp_hysteresis: float = 1.0
+    ha_heater_entity_id: str = ""
+    # Weather
+    ha_weather_entity_id: str = ""

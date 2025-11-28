@@ -24,6 +24,19 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "smoothing_enabled": False,
     "smoothing_samples": 5,
     "id_by_mac": False,
+    # Home Assistant settings
+    "ha_enabled": False,
+    "ha_url": "",
+    "ha_token": "",
+    "ha_ambient_temp_entity_id": "",
+    "ha_ambient_humidity_entity_id": "",
+    # Temperature control
+    "temp_control_enabled": False,
+    "temp_target": 68.0,
+    "temp_hysteresis": 1.0,
+    "ha_heater_entity_id": "",
+    # Weather
+    "ha_weather_entity_id": "",
 }
 
 

@@ -9,6 +9,19 @@ export interface AppConfig {
 	smoothing_enabled: boolean;
 	smoothing_samples: number;
 	id_by_mac: boolean;
+	// Home Assistant settings
+	ha_enabled: boolean;
+	ha_url: string;
+	ha_token: string;
+	ha_ambient_temp_entity_id: string;
+	ha_ambient_humidity_entity_id: string;
+	// Temperature control
+	temp_control_enabled: boolean;
+	temp_target: number;
+	temp_hysteresis: number;
+	ha_heater_entity_id: string;
+	// Weather
+	ha_weather_entity_id: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -19,7 +32,20 @@ const DEFAULT_CONFIG: AppConfig = {
 	min_rssi: -100,
 	smoothing_enabled: false,
 	smoothing_samples: 5,
-	id_by_mac: false
+	id_by_mac: false,
+	// Home Assistant
+	ha_enabled: false,
+	ha_url: '',
+	ha_token: '',
+	ha_ambient_temp_entity_id: '',
+	ha_ambient_humidity_entity_id: '',
+	// Temperature control
+	temp_control_enabled: false,
+	temp_target: 68.0,
+	temp_hysteresis: 1.0,
+	ha_heater_entity_id: '',
+	// Weather
+	ha_weather_entity_id: ''
 };
 
 export const configState = $state<{ config: AppConfig; loaded: boolean }>({

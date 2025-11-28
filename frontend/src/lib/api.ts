@@ -46,3 +46,18 @@ export async function updateTiltBeerName(tiltId: string, beerName: string): Prom
 		throw new Error(`Failed to update tilt: ${response.statusText}`);
 	}
 }
+
+export interface AmbientHistoricalReading {
+	id: number;
+	timestamp: string;
+	temperature: number | null;
+	humidity: number | null;
+}
+
+export async function fetchAmbientHistory(hours: number = 24): Promise<AmbientHistoricalReading[]> {
+	const response = await fetch(`${BASE_URL}/ambient/history?hours=${hours}`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch ambient history');
+	}
+	return response.json();
+}

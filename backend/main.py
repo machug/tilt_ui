@@ -16,7 +16,8 @@ from sqlalchemy import select, desc
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
 from .models import Reading, Tilt
-from .routers import config, system, tilts
+from .routers import ambient, config, ha, system, tilts
+from .ambient_poller import start_ambient_poller, stop_ambient_poller
 from .cleanup import CleanupService
 from .scanner import TiltReading, TiltScanner
 from .services.calibration import calibration_service
@@ -103,10 +104,15 @@ async def lifespan(app: FastAPI):
     cleanup_service = CleanupService(retention_days=30, interval_hours=1)
     await cleanup_service.start()
 
+    # Start ambient poller for Home Assistant integration
+    start_ambient_poller()
+    print("Ambient poller started")
+
     yield
 
     # Shutdown
     print("Shutting down Tilt UI...")
+    stop_ambient_poller()
     if cleanup_service:
         await cleanup_service.stop()
     if scanner:
@@ -127,6 +133,8 @@ app = FastAPI(title="Tilt UI", version=VERSION, lifespan=lifespan)
 app.include_router(tilts.router)
 app.include_router(config.router)
 app.include_router(system.router)
+app.include_router(ambient.router)
+app.include_router(ha.router)
 
 
 @app.get("/api/health")

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { tiltsState, connectWebSocket, disconnectWebSocket } from '$lib/stores/tilts.svelte';
+	import { configState, formatTemp, getTempUnit } from '$lib/stores/config.svelte';
 	import TiltCard from '$lib/components/TiltCard.svelte';
 
 	onMount(() => {
@@ -15,6 +16,15 @@
 
 	function toggleExpand(tiltId: string) {
 		expandedTiltId = expandedTiltId === tiltId ? null : tiltId;
+	}
+
+	// Format ambient temp based on user's unit preference
+	// Ambient temp from HA is typically in Celsius, convert if needed
+	function formatAmbientTemp(tempC: number): string {
+		if (configState.config.temp_units === 'F') {
+			return ((tempC * 9) / 5 + 32).toFixed(1);
+		}
+		return tempC.toFixed(1);
 	}
 </script>
 
@@ -58,6 +68,34 @@
 			/>
 		{/each}
 	</div>
+
+	<!-- Ambient Temperature -->
+	{#if tiltsState.ambient && (tiltsState.ambient.temperature !== null || tiltsState.ambient.humidity !== null)}
+		<div class="ambient-card">
+			<div class="ambient-header">
+				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+				</svg>
+				<span>Room Ambient</span>
+			</div>
+			<div class="ambient-values">
+				{#if tiltsState.ambient.temperature !== null}
+					<div class="ambient-value">
+						<span class="value">{formatAmbientTemp(tiltsState.ambient.temperature)}</span>
+						<span class="unit">{getTempUnit()}</span>
+						<span class="label">Temp</span>
+					</div>
+				{/if}
+				{#if tiltsState.ambient.humidity !== null}
+					<div class="ambient-value">
+						<span class="value">{tiltsState.ambient.humidity.toFixed(0)}</span>
+						<span class="unit">%</span>
+						<span class="label">Humidity</span>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 {/if}
 
 <style>
@@ -169,5 +207,61 @@
 	.empty-hint svg {
 		flex-shrink: 0;
 		color: var(--amber-400);
+	}
+
+	/* Ambient Card */
+	.ambient-card {
+		background: var(--bg-card);
+		border: 1px solid var(--bg-hover);
+		border-radius: 0.75rem;
+		padding: 1rem 1.25rem;
+		margin-top: 1.5rem;
+	}
+
+	.ambient-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.75rem;
+	}
+
+	.ambient-header svg {
+		width: 1rem;
+		height: 1rem;
+	}
+
+	.ambient-values {
+		display: flex;
+		gap: 2rem;
+	}
+
+	.ambient-value {
+		display: flex;
+		align-items: baseline;
+		gap: 0.25rem;
+	}
+
+	.ambient-value .value {
+		font-size: 1.5rem;
+		font-weight: 600;
+		font-family: 'JetBrains Mono', monospace;
+		color: var(--text-primary);
+	}
+
+	.ambient-value .unit {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+	}
+
+	.ambient-value .label {
+		font-size: 0.625rem;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		margin-left: 0.5rem;
 	}
 </style>

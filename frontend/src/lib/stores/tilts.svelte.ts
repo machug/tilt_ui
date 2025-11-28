@@ -12,10 +12,21 @@ export interface TiltReading {
 	last_seen: string;
 }
 
+export interface AmbientReading {
+	temperature: number | null;
+	humidity: number | null;
+	timestamp: string;
+}
+
 // Shared reactive state using Svelte 5 $state rune
-export const tiltsState = $state<{ tilts: Map<string, TiltReading>; connected: boolean }>({
+export const tiltsState = $state<{
+	tilts: Map<string, TiltReading>;
+	connected: boolean;
+	ambient: AmbientReading | null;
+}>({
 	tilts: new Map(),
-	connected: false
+	connected: false,
+	ambient: null
 });
 
 let ws: WebSocket | null = null;
@@ -41,7 +52,20 @@ export function connectWebSocket() {
 
 	ws.onmessage = (event) => {
 		try {
-			const reading: TiltReading = JSON.parse(event.data);
+			const data = JSON.parse(event.data);
+
+			// Handle ambient readings
+			if (data.type === 'ambient') {
+				tiltsState.ambient = {
+					temperature: data.temperature,
+					humidity: data.humidity,
+					timestamp: data.timestamp
+				};
+				return;
+			}
+
+			// Handle tilt readings
+			const reading: TiltReading = data;
 			tiltsState.tilts.set(reading.id, reading);
 			// Trigger reactivity by reassigning
 			tiltsState.tilts = new Map(tiltsState.tilts);

@@ -37,6 +37,17 @@
 	let cleanupRetentionDays = $state(30);
 	let cleanupPreview = $state<{ readings_to_delete: number } | null>(null);
 
+	// Home Assistant state
+	let haEnabled = $state(false);
+	let haUrl = $state('');
+	let haToken = $state('');
+	let haAmbientTempEntityId = $state('');
+	let haAmbientHumidityEntityId = $state('');
+	let haWeatherEntityId = $state('');
+	let haTesting = $state(false);
+	let haTestResult = $state<{ success: boolean; message: string } | null>(null);
+	let haStatus = $state<{ enabled: boolean; connected: boolean; url: string } | null>(null);
+
 	async function loadSystemInfo() {
 		try {
 			const response = await fetch('/api/system/info');
@@ -84,6 +95,13 @@
 		smoothingEnabled = configState.config.smoothing_enabled;
 		smoothingSamples = configState.config.smoothing_samples;
 		idByMac = configState.config.id_by_mac;
+		// Home Assistant
+		haEnabled = configState.config.ha_enabled;
+		haUrl = configState.config.ha_url;
+		haToken = configState.config.ha_token;
+		haAmbientTempEntityId = configState.config.ha_ambient_temp_entity_id;
+		haAmbientHumidityEntityId = configState.config.ha_ambient_humidity_entity_id;
+		haWeatherEntityId = configState.config.ha_weather_entity_id;
 	}
 
 	async function saveConfig() {
@@ -96,11 +114,20 @@
 				min_rssi: minRssi,
 				smoothing_enabled: smoothingEnabled,
 				smoothing_samples: smoothingSamples,
-				id_by_mac: idByMac
+				id_by_mac: idByMac,
+				// Home Assistant
+				ha_enabled: haEnabled,
+				ha_url: haUrl,
+				ha_token: haToken,
+				ha_ambient_temp_entity_id: haAmbientTempEntityId,
+				ha_ambient_humidity_entity_id: haAmbientHumidityEntityId,
+				ha_weather_entity_id: haWeatherEntityId
 			});
 			if (result.success) {
 				configSuccess = true;
-				setTimeout(() => configSuccess = false, 3000);
+				setTimeout(() => (configSuccess = false), 3000);
+				// Reload HA status after saving
+				await loadHAStatus();
 			} else {
 				configError = result.error || 'Failed to save settings';
 			}
@@ -230,11 +257,44 @@
 		return n.toLocaleString();
 	}
 
+	async function testHAConnection() {
+		haTesting = true;
+		haTestResult = null;
+		try {
+			const response = await fetch('/api/ha/test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url: haUrl, token: haToken })
+			});
+			if (response.ok) {
+				haTestResult = await response.json();
+			} else {
+				haTestResult = { success: false, message: 'Request failed' };
+			}
+		} catch (e) {
+			haTestResult = { success: false, message: 'Network error' };
+		} finally {
+			haTesting = false;
+		}
+	}
+
+	async function loadHAStatus() {
+		try {
+			const response = await fetch('/api/ha/status');
+			if (response.ok) {
+				haStatus = await response.json();
+			}
+		} catch (e) {
+			console.error('Failed to load HA status:', e);
+		}
+	}
+
 	onMount(async () => {
 		await Promise.all([
 			loadSystemInfo(),
 			loadStorageStats(),
-			loadTimezones()
+			loadTimezones(),
+			loadHAStatus()
 		]);
 		syncConfigFromStore();
 		loading = false;
@@ -447,6 +507,138 @@
 							{/if}
 						</div>
 					</div>
+				</div>
+			</div>
+
+			<!-- Home Assistant Integration -->
+			<div class="card">
+				<div class="card-header">
+					<h2 class="card-title">Home Assistant</h2>
+				</div>
+				<div class="card-body">
+					<!-- Enable/Disable -->
+					<div class="setting-row">
+						<div class="setting-info">
+							<span class="setting-label">Enable Integration</span>
+							<span class="setting-description">Connect to Home Assistant for ambient temp and control</span>
+						</div>
+						<button
+							type="button"
+							class="toggle"
+							class:active={haEnabled}
+							onclick={() => (haEnabled = !haEnabled)}
+							aria-pressed={haEnabled}
+							aria-label="Enable Home Assistant integration"
+						>
+							<span class="toggle-slider"></span>
+						</button>
+					</div>
+
+					{#if haEnabled}
+						<!-- Connection Status -->
+						{#if haStatus}
+							<div class="setting-row">
+								<div class="setting-info">
+									<span class="setting-label">Connection Status</span>
+								</div>
+								<span class="status-badge" class:connected={haStatus.connected}>
+									{haStatus.connected ? 'Connected' : 'Disconnected'}
+								</span>
+							</div>
+						{/if}
+
+						<!-- HA URL -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Home Assistant URL</span>
+								<span class="setting-description">e.g., http://192.168.1.100:8123</span>
+							</div>
+							<input
+								type="url"
+								bind:value={haUrl}
+								placeholder="http://homeassistant.local:8123"
+								class="input-field"
+							/>
+						</div>
+
+						<!-- HA Token -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Access Token</span>
+								<span class="setting-description">Long-lived access token from HA profile</span>
+							</div>
+							<input
+								type="password"
+								bind:value={haToken}
+								placeholder="Enter token..."
+								class="input-field"
+							/>
+						</div>
+
+						<!-- Test Connection -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Test Connection</span>
+							</div>
+							<div class="test-connection">
+								<button
+									type="button"
+									class="btn-secondary-sm"
+									onclick={testHAConnection}
+									disabled={haTesting || !haUrl || !haToken}
+								>
+									{haTesting ? 'Testing...' : 'Test'}
+								</button>
+								{#if haTestResult}
+									<span class="test-result" class:success={haTestResult.success}>
+										{haTestResult.message}
+									</span>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Ambient Temp Entity -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Ambient Temp Entity</span>
+								<span class="setting-description">e.g., sensor.fermenter_room_temperature</span>
+							</div>
+							<input
+								type="text"
+								bind:value={haAmbientTempEntityId}
+								placeholder="sensor.xxx_temperature"
+								class="input-field"
+							/>
+						</div>
+
+						<!-- Ambient Humidity Entity -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Ambient Humidity Entity</span>
+								<span class="setting-description">Optional humidity sensor</span>
+							</div>
+							<input
+								type="text"
+								bind:value={haAmbientHumidityEntityId}
+								placeholder="sensor.xxx_humidity"
+								class="input-field"
+							/>
+						</div>
+
+						<!-- Weather Entity -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Weather Entity</span>
+								<span class="setting-description">For forecast display, e.g., weather.home</span>
+							</div>
+							<input
+								type="text"
+								bind:value={haWeatherEntityId}
+								placeholder="weather.home"
+								class="input-field"
+							/>
+						</div>
+					{/if}
 				</div>
 			</div>
 
@@ -1083,6 +1275,55 @@
 
 	.config-success {
 		font-size: 0.75rem;
+		color: var(--tilt-green);
+	}
+
+	/* Home Assistant Inputs */
+	.input-field {
+		width: 16rem;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--text-primary);
+		background: var(--bg-elevated);
+		border: 1px solid var(--bg-hover);
+		border-radius: 0.375rem;
+	}
+
+	.input-field:focus {
+		outline: none;
+		border-color: var(--amber-400);
+	}
+
+	.input-field::placeholder {
+		color: var(--text-muted);
+	}
+
+	.status-badge {
+		padding: 0.25rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		border-radius: 9999px;
+		background: rgba(244, 63, 94, 0.1);
+		color: var(--tilt-red);
+	}
+
+	.status-badge.connected {
+		background: rgba(16, 185, 129, 0.1);
+		color: var(--tilt-green);
+	}
+
+	.test-connection {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.test-result {
+		font-size: 0.75rem;
+		color: var(--tilt-red);
+	}
+
+	.test-result.success {
 		color: var(--tilt-green);
 	}
 

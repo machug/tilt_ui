@@ -41,7 +41,12 @@ export async function loadConfig(): Promise<void> {
 	}
 }
 
-export async function updateConfig(updates: Partial<AppConfig>): Promise<boolean> {
+export interface ConfigUpdateResult {
+	success: boolean;
+	error?: string;
+}
+
+export async function updateConfig(updates: Partial<AppConfig>): Promise<ConfigUpdateResult> {
 	try {
 		const response = await fetch('/api/config', {
 			method: 'PATCH',
@@ -51,12 +56,19 @@ export async function updateConfig(updates: Partial<AppConfig>): Promise<boolean
 		if (response.ok) {
 			const data = await response.json();
 			configState.config = { ...DEFAULT_CONFIG, ...data };
-			return true;
+			return { success: true };
 		}
+		// Handle validation errors
+		const errorData = await response.json();
+		if (errorData.detail && Array.isArray(errorData.detail)) {
+			const messages = errorData.detail.map((d: { msg: string }) => d.msg).join(', ');
+			return { success: false, error: messages };
+		}
+		return { success: false, error: 'Failed to save settings' };
 	} catch (e) {
 		console.error('Failed to update config:', e);
+		return { success: false, error: 'Network error saving settings' };
 	}
-	return false;
 }
 
 // Temperature conversion utilities

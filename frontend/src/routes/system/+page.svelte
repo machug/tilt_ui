@@ -30,6 +30,8 @@
 	let smoothingSamples = $state(5);
 	let idByMac = $state(false);
 	let configSaving = $state(false);
+	let configError = $state<string | null>(null);
+	let configSuccess = $state(false);
 
 	// Cleanup state
 	let cleanupRetentionDays = $state(30);
@@ -86,14 +88,22 @@
 
 	async function saveConfig() {
 		configSaving = true;
+		configError = null;
+		configSuccess = false;
 		try {
-			await updateConfig({
+			const result = await updateConfig({
 				temp_units: tempUnits,
 				min_rssi: minRssi,
 				smoothing_enabled: smoothingEnabled,
 				smoothing_samples: smoothingSamples,
 				id_by_mac: idByMac
 			});
+			if (result.success) {
+				configSuccess = true;
+				setTimeout(() => configSuccess = false, 3000);
+			} else {
+				configError = result.error || 'Failed to save settings';
+			}
 		} finally {
 			configSaving = false;
 		}
@@ -387,8 +397,8 @@
 							</button>
 						</div>
 
-						<!-- Save Button -->
-						<div class="mt-4">
+						<!-- Save Button & Feedback -->
+						<div class="mt-4 config-actions">
 							<button
 								type="button"
 								class="btn-primary"
@@ -402,6 +412,12 @@
 									Save Settings
 								{/if}
 							</button>
+							{#if configError}
+								<p class="config-error">{configError}</p>
+							{/if}
+							{#if configSuccess}
+								<p class="config-success">Settings saved</p>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -1050,6 +1066,24 @@
 
 	.mb-3 {
 		margin-bottom: 0.75rem;
+	}
+
+	/* Config feedback */
+	.config-actions {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.config-error {
+		font-size: 0.75rem;
+		color: var(--tilt-red);
+	}
+
+	.config-success {
+		font-size: 0.75rem;
+		color: var(--tilt-green);
 	}
 
 	@media (max-width: 640px) {

@@ -16,6 +16,7 @@
 
 	// System timezone for chart display
 	let systemTimezone = $state<string>('UTC');
+	let mounted = $state(false);
 
 	interface Props {
 		tiltId: string;
@@ -397,7 +398,8 @@
 			console.warn('Failed to fetch system timezone, using UTC');
 		}
 
-		loadData();
+		await loadData();
+		mounted = true;
 		window.addEventListener('resize', handleResize);
 	});
 
@@ -406,9 +408,9 @@
 		window.removeEventListener('resize', handleResize);
 	});
 
-	// Reload when range changes
+	// Reload when range changes (only after initial mount)
 	$effect(() => {
-		if (selectedRange) {
+		if (mounted && selectedRange) {
 			loadData();
 		}
 	});

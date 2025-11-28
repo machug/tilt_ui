@@ -215,9 +215,12 @@
 		{/if}
 
 		<!-- Expandable chart section - use CSS to hide instead of destroying -->
+		<!-- Key on tilt.id ensures stable component identity across parent re-renders -->
 		{#if chartMounted}
 			<div class="chart-section" class:hidden={!expanded}>
-				<TiltChart tiltId={tilt.id} tiltColor={tilt.color} />
+				{#key tilt.id}
+					<TiltChart tiltId={tilt.id} tiltColor={tilt.color} />
+				{/key}
 			</div>
 		{/if}
 

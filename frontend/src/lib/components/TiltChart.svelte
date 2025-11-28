@@ -387,12 +387,16 @@
 	return [timestamps, sgValues, tempValues, ambientValues];
 }
 
-async function loadData(force = false) {
-	const refreshMs = refreshMinutes * 60 * 1000;
-	const now = Date.now();
+// Minimum interval between data fetches (30 seconds) to prevent BLE event spam
+const MIN_FETCH_INTERVAL_MS = 30000;
 
-	// Prevent rapid reloads (e.g., from frequent BLE updates) unless forced
-	if (!force && refreshMinutes > 0 && now - lastLoadTime < refreshMs - 500) {
+async function loadData(userTriggered = false) {
+	const now = Date.now();
+	const timeSinceLastLoad = now - lastLoadTime;
+
+	// For automatic reloads, respect the minimum fetch interval
+	// User-triggered actions (range change, manual refresh) always proceed
+	if (!userTriggered && lastLoadTime > 0 && timeSinceLastLoad < MIN_FETCH_INTERVAL_MS) {
 		return;
 	}
 
@@ -447,7 +451,8 @@ function resetRefreshInterval() {
 		const intervalMs = refreshMinutes * 60 * 1000;
 		refreshInterval = setInterval(() => {
 			if (!loading) {
-				loadData();
+				// Automatic refresh - NOT user triggered, subject to throttling
+				loadData(false);
 			}
 		}, intervalMs);
 	}
@@ -474,6 +479,7 @@ onMount(async () => {
 			console.warn('Failed to fetch system timezone, using UTC');
 		}
 
+		// Initial load is user-triggered (mounting the component)
 		await loadData(true);
 		mounted = true;
 		window.addEventListener('resize', handleResize);
@@ -488,11 +494,17 @@ onMount(async () => {
 		}
 	});
 
-	// Reload when range changes (only after initial mount)
+	// Track previous range to detect actual changes
+	let prevRange = $state<number | null>(null);
+
+	// Reload when range CHANGES (not on initial mount - that's handled by onMount)
 	$effect(() => {
-		if (mounted && selectedRange) {
+		const currentRange = selectedRange;
+		if (mounted && prevRange !== null && prevRange !== currentRange) {
+			// Range actually changed - user triggered action
 			loadData(true);
 		}
+		prevRange = currentRange;
 	});
 
 	// Re-render chart when temp units or smoothing settings change
@@ -516,6 +528,7 @@ onMount(async () => {
 		refreshMinutes = minutes;
 		localStorage.setItem(REFRESH_STORAGE_KEY, String(minutes));
 		resetRefreshInterval();
+		// User changed refresh setting - trigger immediate reload
 		loadData(true);
 	}
 </script>
@@ -574,7 +587,7 @@ onMount(async () => {
 		{#if error}
 			<div class="chart-error">
 				<span>Failed to load chart</span>
-				<button type="button" class="retry-btn" onclick={loadData}>Retry</button>
+				<button type="button" class="retry-btn" onclick={() => loadData(true)}>Retry</button>
 			</div>
 		{:else if readings.length === 0}
 			<div class="chart-empty">

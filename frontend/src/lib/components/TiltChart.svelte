@@ -4,6 +4,10 @@
 	import { fetchReadings, TIME_RANGES, type HistoricalReading } from '$lib/api';
 	import { configState, fahrenheitToCelsius } from '$lib/stores/config.svelte';
 
+	// Get smoothing settings from config
+	let smoothingEnabled = $derived(configState.config.smoothing_enabled);
+	let smoothingSamples = $derived(configState.config.smoothing_samples);
+
 	interface Props {
 		tiltId: string;
 		tiltColor: string;
@@ -128,7 +132,8 @@
 						gradient.addColorStop(1, 'transparent');
 						return gradient;
 					},
-					points: { show: false }
+					points: { show: false },
+					paths: uPlot.paths.spline?.() // Smooth spline interpolation
 				},
 				{
 					// Temp series
@@ -137,19 +142,80 @@
 					stroke: tempColor,
 					width: 1.5,
 					dash: [4, 4],
-					points: { show: false }
+					points: { show: false },
+					paths: uPlot.paths.spline?.() // Smooth spline interpolation
 				}
 			]
 		};
+	}
+
+	// Moving average smoothing function
+	function smoothData(values: (number | null)[], windowSize: number): (number | null)[] {
+		if (windowSize <= 1) return values;
+
+		const result: (number | null)[] = [];
+		for (let i = 0; i < values.length; i++) {
+			// Collect valid values in the window
+			const windowValues: number[] = [];
+			const halfWindow = Math.floor(windowSize / 2);
+
+			for (let j = Math.max(0, i - halfWindow); j <= Math.min(values.length - 1, i + halfWindow); j++) {
+				const v = values[j];
+				if (v !== null) windowValues.push(v);
+			}
+
+			if (windowValues.length > 0) {
+				result.push(windowValues.reduce((a, b) => a + b, 0) / windowValues.length);
+			} else {
+				result.push(null);
+			}
+		}
+		return result;
+	}
+
+	// Downsample data for longer time ranges to improve performance
+	function downsampleData(
+		timestamps: number[],
+		sgValues: (number | null)[],
+		tempValues: (number | null)[],
+		maxPoints: number
+	): [number[], (number | null)[], (number | null)[]] {
+		if (timestamps.length <= maxPoints) {
+			return [timestamps, sgValues, tempValues];
+		}
+
+		const step = Math.ceil(timestamps.length / maxPoints);
+		const newTimestamps: number[] = [];
+		const newSg: (number | null)[] = [];
+		const newTemp: (number | null)[] = [];
+
+		for (let i = 0; i < timestamps.length; i += step) {
+			// Average values in this bucket
+			const bucketEnd = Math.min(i + step, timestamps.length);
+			let sgSum = 0, sgCount = 0;
+			let tempSum = 0, tempCount = 0;
+
+			for (let j = i; j < bucketEnd; j++) {
+				if (sgValues[j] !== null) { sgSum += sgValues[j]!; sgCount++; }
+				if (tempValues[j] !== null) { tempSum += tempValues[j]!; tempCount++; }
+			}
+
+			// Use middle timestamp of bucket
+			newTimestamps.push(timestamps[Math.floor((i + bucketEnd - 1) / 2)]);
+			newSg.push(sgCount > 0 ? sgSum / sgCount : null);
+			newTemp.push(tempCount > 0 ? tempSum / tempCount : null);
+		}
+
+		return [newTimestamps, newSg, newTemp];
 	}
 
 	function processData(readings: HistoricalReading[], celsius: boolean): uPlot.AlignedData {
 		// Readings come newest first, reverse for chronological order
 		const sorted = [...readings].reverse();
 
-		const timestamps: number[] = [];
-		const sgValues: (number | null)[] = [];
-		const tempValues: (number | null)[] = [];
+		let timestamps: number[] = [];
+		let sgValues: (number | null)[] = [];
+		let tempValues: (number | null)[] = [];
 
 		for (const r of sorted) {
 			timestamps.push(new Date(r.timestamp).getTime() / 1000);
@@ -163,6 +229,16 @@
 				tempValues.push(null);
 			}
 		}
+
+		// Apply smoothing if enabled in config
+		if (smoothingEnabled && smoothingSamples > 1) {
+			sgValues = smoothData(sgValues, smoothingSamples);
+			tempValues = smoothData(tempValues, smoothingSamples);
+		}
+
+		// Downsample for performance (max 500 points)
+		const maxPoints = 500;
+		[timestamps, sgValues, tempValues] = downsampleData(timestamps, sgValues, tempValues, maxPoints);
 
 		return [timestamps, sgValues, tempValues];
 	}
@@ -217,9 +293,18 @@
 		}
 	});
 
-	// Re-render chart when temp units change
+	// Re-render chart when temp units or smoothing settings change
 	$effect(() => {
 		if (useCelsius !== undefined && readings.length > 0 && chartContainer) {
+			updateChart();
+		}
+	});
+
+	// Re-render chart when smoothing settings change
+	$effect(() => {
+		// Track smoothing changes
+		const _ = [smoothingEnabled, smoothingSamples];
+		if (readings.length > 0 && chartContainer) {
 			updateChart();
 		}
 	});

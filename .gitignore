@@ -16,9 +16,8 @@ build/
 node_modules/
 .npm
 
-# Frontend build output
+# Frontend build output (intermediate)
 frontend/.svelte-kit/
-backend/static/
 
 # Database & data
 data/

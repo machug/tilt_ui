@@ -303,8 +303,8 @@
 	}
 
 	.toggle.active {
-		background: rgba(251, 191, 36, 0.2);
-		border-color: var(--amber-400);
+		background: var(--accent-muted);
+		border-color: var(--accent);
 	}
 
 	.toggle-slider {
@@ -320,7 +320,7 @@
 
 	.toggle.active .toggle-slider {
 		left: calc(100% - 1.125rem - 2px);
-		background: var(--amber-400);
+		background: var(--accent);
 	}
 
 	/* Select Input */
@@ -347,7 +347,7 @@
 
 	.select-input:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	/* Buttons */
@@ -358,8 +358,8 @@
 		padding: 0.625rem 1.25rem;
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: var(--bg-deep);
-		background: var(--amber-400);
+		color: white;
+		background: var(--accent);
 		border: none;
 		border-radius: 0.5rem;
 		cursor: pointer;
@@ -367,7 +367,7 @@
 	}
 
 	.btn-primary:hover {
-		background: var(--amber-500);
+		background: var(--accent-hover);
 	}
 
 	.btn-primary:disabled {
@@ -382,9 +382,9 @@
 		padding: 0.625rem 1.25rem;
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: var(--amber-400);
-		background: rgba(251, 191, 36, 0.1);
-		border: 1px solid rgba(251, 191, 36, 0.2);
+		color: var(--accent);
+		background: var(--accent-muted);
+		border: 1px solid var(--accent);
 		border-radius: 0.5rem;
 		cursor: pointer;
 		text-decoration: none;
@@ -392,8 +392,9 @@
 	}
 
 	.btn-secondary:hover {
-		background: rgba(251, 191, 36, 0.15);
-		border-color: rgba(251, 191, 36, 0.3);
+		background: var(--accent-hover);
+		color: white;
+		border-color: var(--accent-hover);
 	}
 
 	/* Stats */
@@ -418,7 +419,7 @@
 	.stat-value {
 		font-size: 1.25rem;
 		font-weight: 600;
-		color: var(--amber-400);
+		color: var(--accent);
 	}
 
 	.stat-label {
@@ -463,7 +464,7 @@
 		width: 1.25rem;
 		height: 1.25rem;
 		border: 2px solid var(--bg-hover);
-		border-top-color: var(--amber-400);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}

@@ -251,7 +251,7 @@
 									<div class="table-row">
 										<span class="font-mono">{formatSG(point.raw_value)}</span>
 										<span class="text-[var(--text-muted)]">→</span>
-										<span class="font-mono text-[var(--amber-400)]">{formatSG(point.actual_value)}</span>
+										<span class="font-mono text-[var(--accent)]">{formatSG(point.actual_value)}</span>
 									</div>
 								{/each}
 							</div>
@@ -343,7 +343,7 @@
 									<div class="table-row">
 										<span class="font-mono">{formatTempDisplay(point.raw_value)}°</span>
 										<span class="text-[var(--text-muted)]">→</span>
-										<span class="font-mono text-[var(--amber-400)]">{formatTempDisplay(point.actual_value)}°</span>
+										<span class="font-mono text-[var(--accent)]">{formatTempDisplay(point.actual_value)}°</span>
 									</div>
 								{/each}
 							</div>
@@ -496,7 +496,7 @@
 
 	.select-input:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	.tilt-info {
@@ -590,7 +590,7 @@
 
 	.input-field:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	.input-field::placeholder {
@@ -610,17 +610,17 @@
 		justify-content: center;
 		width: 2.25rem;
 		height: 2.25rem;
-		color: var(--amber-400);
-		background: rgba(251, 191, 36, 0.1);
-		border: 1px solid rgba(251, 191, 36, 0.2);
+		color: white;
+		background: var(--accent);
+		border: 1px solid var(--accent);
 		border-radius: 0.5rem;
 		cursor: pointer;
 		transition: all 0.15s ease;
 	}
 
 	.btn-add:hover:not(:disabled) {
-		background: rgba(251, 191, 36, 0.15);
-		border-color: rgba(251, 191, 36, 0.3);
+		background: var(--accent-hover);
+		border-color: var(--accent-hover);
 	}
 
 	.btn-add:disabled {
@@ -686,7 +686,7 @@
 
 	.tip-label {
 		font-weight: 600;
-		color: var(--amber-400);
+		color: var(--accent);
 		margin-right: 0.25rem;
 	}
 
@@ -705,7 +705,7 @@
 		width: 2rem;
 		height: 2rem;
 		border: 2px solid var(--bg-hover);
-		border-top-color: var(--amber-400);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -723,7 +723,7 @@
 		width: 1rem;
 		height: 1rem;
 		border: 2px solid var(--bg-hover);
-		border-top-color: var(--amber-400);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}

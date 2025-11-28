@@ -73,7 +73,14 @@
 				temp: {
 					auto: true,
 					range: (u, min, max) => {
-						const padding = (max - min) * 0.1 || 2;
+						// Ensure minimum 10-degree range so small fluctuations don't look exaggerated
+						const dataRange = max - min;
+						const minRange = 10;
+						if (dataRange < minRange) {
+							const center = (max + min) / 2;
+							return [center - minRange / 2, center + minRange / 2];
+						}
+						const padding = dataRange * 0.1;
 						return [min - padding, max + padding];
 					}
 				}

@@ -44,9 +44,13 @@
 	let haAmbientTempEntityId = $state('');
 	let haAmbientHumidityEntityId = $state('');
 	let haWeatherEntityId = $state('');
+	let haHeaterEntityId = $state('');
 	let haTesting = $state(false);
 	let haTestResult = $state<{ success: boolean; message: string } | null>(null);
 	let haStatus = $state<{ enabled: boolean; connected: boolean; url: string } | null>(null);
+	let haSaving = $state(false);
+	let haError = $state<string | null>(null);
+	let haSuccess = $state(false);
 
 	async function loadSystemInfo() {
 		try {
@@ -102,6 +106,7 @@
 		haAmbientTempEntityId = configState.config.ha_ambient_temp_entity_id;
 		haAmbientHumidityEntityId = configState.config.ha_ambient_humidity_entity_id;
 		haWeatherEntityId = configState.config.ha_weather_entity_id;
+		haHeaterEntityId = configState.config.ha_heater_entity_id;
 	}
 
 	async function saveConfig() {
@@ -114,25 +119,43 @@
 				min_rssi: minRssi,
 				smoothing_enabled: smoothingEnabled,
 				smoothing_samples: smoothingSamples,
-				id_by_mac: idByMac,
-				// Home Assistant
-				ha_enabled: haEnabled,
-				ha_url: haUrl,
-				ha_token: haToken,
-				ha_ambient_temp_entity_id: haAmbientTempEntityId,
-				ha_ambient_humidity_entity_id: haAmbientHumidityEntityId,
-				ha_weather_entity_id: haWeatherEntityId
+				id_by_mac: idByMac
 			});
 			if (result.success) {
 				configSuccess = true;
 				setTimeout(() => (configSuccess = false), 3000);
-				// Reload HA status after saving
-				await loadHAStatus();
 			} else {
 				configError = result.error || 'Failed to save settings';
 			}
 		} finally {
 			configSaving = false;
+		}
+	}
+
+	async function saveHAConfig() {
+		haSaving = true;
+		haError = null;
+		haSuccess = false;
+		try {
+			const result = await updateConfig({
+				ha_enabled: haEnabled,
+				ha_url: haUrl,
+				ha_token: haToken,
+				ha_ambient_temp_entity_id: haAmbientTempEntityId,
+				ha_ambient_humidity_entity_id: haAmbientHumidityEntityId,
+				ha_weather_entity_id: haWeatherEntityId,
+				ha_heater_entity_id: haHeaterEntityId
+			});
+			if (result.success) {
+				haSuccess = true;
+				setTimeout(() => (haSuccess = false), 3000);
+				// Reload HA status after saving
+				await loadHAStatus();
+			} else {
+				haError = result.error || 'Failed to save settings';
+			}
+		} finally {
+			haSaving = false;
 		}
 	}
 
@@ -637,6 +660,43 @@
 								placeholder="weather.home"
 								class="input-field"
 							/>
+						</div>
+
+						<!-- Heater Entity -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Heater Switch Entity</span>
+								<span class="setting-description">Switch to control fermentation heating</span>
+							</div>
+							<input
+								type="text"
+								bind:value={haHeaterEntityId}
+								placeholder="switch.fermenter_heater"
+								class="input-field"
+							/>
+						</div>
+
+						<!-- Save Button & Feedback -->
+						<div class="mt-4 config-actions">
+							<button
+								type="button"
+								class="btn-primary"
+								onclick={saveHAConfig}
+								disabled={haSaving}
+							>
+								{#if haSaving}
+									<span class="loading-dot"></span>
+									Saving...
+								{:else}
+									Save HA Settings
+								{/if}
+							</button>
+							{#if haError}
+								<p class="config-error">{haError}</p>
+							{/if}
+							{#if haSuccess}
+								<p class="config-success">Settings saved</p>
+							{/if}
 						</div>
 					{/if}
 				</div>

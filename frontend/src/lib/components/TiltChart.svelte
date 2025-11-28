@@ -56,6 +56,40 @@
 	const GRID_COLOR = 'rgba(255, 255, 255, 0.04)';
 	const CYAN = '#22d3ee'; // Ambient temp color
 
+	// Create a date formatter for the target timezone
+	function formatTimeInTz(timestamp: number, tz: string, short: boolean): string {
+		const date = new Date(timestamp * 1000);
+		try {
+			if (short) {
+				return date.toLocaleTimeString('en-AU', {
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false,
+					timeZone: tz
+				});
+			}
+			return date.toLocaleDateString('en-AU', {
+				month: 'short',
+				day: 'numeric',
+				timeZone: tz
+			});
+		} catch (e) {
+			// Fallback if timezone is invalid
+			console.warn('Invalid timezone:', tz, e);
+			if (short) {
+				return date.toLocaleTimeString('en-AU', {
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false
+				});
+			}
+			return date.toLocaleDateString('en-AU', {
+				month: 'short',
+				day: 'numeric'
+			});
+		}
+	}
+
 	function getChartOptions(width: number, celsius: boolean, tz: string): uPlot.Options {
 		const sgColor = AMBER;
 		const tempColor = tiltColorMap[tiltColor] || TEXT_SECONDARY;
@@ -106,21 +140,7 @@
 					font: '11px "JetBrains Mono", monospace',
 					labelFont: '11px "JetBrains Mono", monospace',
 					values: (u, vals) =>
-						vals.map((v) => {
-							const d = new Date(v * 1000);
-							if (selectedRange <= 24) {
-								return d.toLocaleTimeString([], {
-									hour: '2-digit',
-									minute: '2-digit',
-									timeZone: tz
-								});
-							}
-							return d.toLocaleDateString([], {
-								month: 'short',
-								day: 'numeric',
-								timeZone: tz
-							});
-						})
+						vals.map((v) => formatTimeInTz(v, tz, selectedRange <= 24))
 				},
 				{
 					// Y axis left (SG)
@@ -251,6 +271,15 @@
 		return [newTimestamps, newSg, newTemp, newAmbient];
 	}
 
+	// Parse timestamp string as UTC (backend stores UTC but may omit Z suffix)
+	function parseUtcTimestamp(timestamp: string): number {
+		// If timestamp doesn't end with Z or timezone offset, treat as UTC
+		if (!timestamp.endsWith('Z') && !timestamp.match(/[+-]\d{2}:\d{2}$/)) {
+			timestamp = timestamp + 'Z';
+		}
+		return new Date(timestamp).getTime() / 1000;
+	}
+
 	// Interpolate ambient readings to match tilt timestamps
 	function interpolateAmbientToTimestamps(
 		ambientReadings: AmbientHistoricalReading[],
@@ -263,11 +292,11 @@
 
 		// Sort ambient readings by timestamp (oldest first)
 		const sortedAmbient = [...ambientReadings].sort(
-			(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+			(a, b) => parseUtcTimestamp(a.timestamp) - parseUtcTimestamp(b.timestamp)
 		);
 
 		// Extract timestamps and temps from ambient readings
-		const ambientTimes = sortedAmbient.map(r => new Date(r.timestamp).getTime() / 1000);
+		const ambientTimes = sortedAmbient.map(r => parseUtcTimestamp(r.timestamp));
 		const ambientTemps = sortedAmbient.map(r => {
 			if (r.temperature === null) return null;
 			// Ambient is in Celsius from HA, convert to F if needed
@@ -318,7 +347,7 @@
 		let tempValues: (number | null)[] = [];
 
 		for (const r of sorted) {
-			timestamps.push(new Date(r.timestamp).getTime() / 1000);
+			timestamps.push(parseUtcTimestamp(r.timestamp));
 			sgValues.push(r.sg_calibrated ?? r.sg_raw);
 
 			// Convert temp if needed
@@ -371,7 +400,6 @@
 		if (!chartContainer || readings.length === 0) return;
 
 		const data = processData(readings, ambientReadings, useCelsius);
-		console.log('updateChart called with timezone:', systemTimezone);
 		const opts = getChartOptions(chartContainer.clientWidth, useCelsius, systemTimezone);
 
 		if (chart) {
@@ -394,7 +422,6 @@
 			if (response.ok) {
 				const data = await response.json();
 				systemTimezone = data.timezone || 'UTC';
-				console.log('Chart using timezone:', systemTimezone);
 			}
 		} catch (e) {
 			console.warn('Failed to fetch system timezone, using UTC');

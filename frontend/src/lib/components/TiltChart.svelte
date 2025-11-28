@@ -415,6 +415,10 @@
 		}
 	}
 
+	// Refresh interval (3 minutes)
+	const REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+	let refreshInterval: ReturnType<typeof setInterval> | null = null;
+
 	onMount(async () => {
 		// Fetch system timezone for chart display
 		try {
@@ -430,11 +434,21 @@
 		await loadData();
 		mounted = true;
 		window.addEventListener('resize', handleResize);
+
+		// Set up periodic refresh (every 3 minutes)
+		refreshInterval = setInterval(() => {
+			if (!loading) {
+				loadData();
+			}
+		}, REFRESH_INTERVAL_MS);
 	});
 
 	onDestroy(() => {
 		chart?.destroy();
 		window.removeEventListener('resize', handleResize);
+		if (refreshInterval) {
+			clearInterval(refreshInterval);
+		}
 	});
 
 	// Reload when range changes (only after initial mount)

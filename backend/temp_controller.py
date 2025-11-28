@@ -337,6 +337,13 @@ def set_manual_override(state: Optional[str], duration_minutes: int = 60) -> boo
     return True
 
 
+def sync_cached_heater_state(state: Optional[str]) -> None:
+    """Keep the in-memory heater state in sync with external changes (e.g., manual HA toggles)."""
+    global _heater_state
+    if state in ("on", "off", None):
+        _heater_state = state
+
+
 def start_temp_controller() -> None:
     """Start the temperature control background task."""
     global _controller_task

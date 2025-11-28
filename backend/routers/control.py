@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import ControlEvent, ControlEventResponse
-from ..temp_controller import get_control_status, set_manual_override, get_latest_tilt_temp
+from ..temp_controller import (
+    get_control_status,
+    set_manual_override,
+    get_latest_tilt_temp,
+    sync_cached_heater_state,
+)
 from ..services.ha_client import get_ha_client, init_ha_client
 from .config import get_config_value
 
@@ -200,6 +205,9 @@ async def get_heater_state(db: AsyncSession = Depends(get_db)):
         else:
             heater_state = None
 
+        # Keep controller cache aligned with the actual HA state so auto logic can react
+        sync_cached_heater_state(heater_state)
+
         return HeaterStateResponse(
             state=heater_state,
             entity_id=heater_entity,
@@ -263,6 +271,8 @@ async def toggle_heater(request: HeaterToggleRequest, db: AsyncSession = Depends
 
     if success:
         logger.info(f"Heater manually toggled to {request.state}")
+        # Keep controller cache aligned with manual toggles so auto logic can disable if needed
+        sync_cached_heater_state(request.state)
         return HeaterToggleResponse(
             success=True,
             message=f"Heater turned {request.state}",

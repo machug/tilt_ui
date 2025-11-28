@@ -371,6 +371,7 @@
 		if (!chartContainer || readings.length === 0) return;
 
 		const data = processData(readings, ambientReadings, useCelsius);
+		console.log('updateChart called with timezone:', systemTimezone);
 		const opts = getChartOptions(chartContainer.clientWidth, useCelsius, systemTimezone);
 
 		if (chart) {

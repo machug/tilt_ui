@@ -14,6 +14,9 @@
 	let smoothingEnabled = $derived(configState.config.smoothing_enabled);
 	let smoothingSamples = $derived(configState.config.smoothing_samples);
 
+	// System timezone for chart display
+	let systemTimezone = $state<string>('UTC');
+
 	interface Props {
 		tiltId: string;
 		tiltColor: string;
@@ -105,9 +108,17 @@
 						vals.map((v) => {
 							const d = new Date(v * 1000);
 							if (selectedRange <= 24) {
-								return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+								return d.toLocaleTimeString([], {
+									hour: '2-digit',
+									minute: '2-digit',
+									timeZone: systemTimezone
+								});
 							}
-							return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+							return d.toLocaleDateString([], {
+								month: 'short',
+								day: 'numeric',
+								timeZone: systemTimezone
+							});
 						})
 				},
 				{
@@ -374,7 +385,18 @@
 		}
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		// Fetch system timezone for chart display
+		try {
+			const response = await fetch('/api/system/timezone');
+			if (response.ok) {
+				const data = await response.json();
+				systemTimezone = data.timezone || 'UTC';
+			}
+		} catch (e) {
+			console.warn('Failed to fetch system timezone, using UTC');
+		}
+
 		loadData();
 		window.addEventListener('resize', handleResize);
 	});

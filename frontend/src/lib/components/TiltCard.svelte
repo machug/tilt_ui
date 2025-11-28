@@ -96,7 +96,7 @@
 </script>
 
 <div
-	class="rounded-lg overflow-hidden animate-fade-in"
+	class="card rounded-lg overflow-hidden animate-fade-in"
 	class:expanded
 	style="background: var(--bg-surface); border: 1px solid var(--border-subtle);"
 >
@@ -235,8 +235,8 @@
 					</button>
 				{/if}
 				<div
-					class="w-1.5 h-1.5 rounded-full animate-pulse-soft"
-					style="background: var(--tilt-green);"
+					class="w-1.5 h-1.5 rounded-full"
+					style="background: var(--positive);"
 				></div>
 			</div>
 		</div>
@@ -244,6 +244,14 @@
 </div>
 
 <style>
+	.card {
+		transition: border-color var(--transition);
+	}
+
+	.card:hover {
+		border-color: var(--border-default);
+	}
+
 	.expanded {
 		grid-column: span 2;
 	}

@@ -658,7 +658,7 @@
 					</div>
 					<div class="card-body">
 						<p class="section-description">
-							Current timezone: <span class="font-mono text-[var(--amber-400)]">{currentTimezone}</span>
+							Current timezone: <span class="font-mono text-[var(--accent)]">{currentTimezone}</span>
 						</p>
 						<div class="timezone-selector">
 							<select
@@ -1275,11 +1275,11 @@
 	}
 
 	.card-title {
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		font-weight: 600;
-		color: var(--text-primary);
-		text-transform: uppercase;
 		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 
 	.card-body {
@@ -1367,8 +1367,7 @@
 	}
 
 	.toggle.active {
-		background: rgba(251, 191, 36, 0.2);
-		border-color: var(--amber-400);
+		background: var(--accent);
 	}
 
 	.toggle-slider {
@@ -1384,32 +1383,38 @@
 
 	.toggle.active .toggle-slider {
 		left: calc(100% - 1.125rem - 2px);
-		background: var(--amber-400);
+		background: white;
 	}
 
 	/* Unit Toggle */
 	.unit-toggle {
 		display: flex;
-		background: var(--bg-elevated);
-		border: 1px solid var(--bg-hover);
-		border-radius: 0.5rem;
-		overflow: hidden;
+		gap: 0.25rem;
 	}
 
 	.unit-btn {
-		padding: 0.375rem 0.75rem;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+		padding: 0.5rem 0.75rem;
 		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		background: transparent;
-		border: none;
+		font-weight: 500;
+		border-radius: 0.375rem;
+		background: var(--bg-elevated);
+		border: 1px solid var(--border-subtle);
+		color: var(--text-secondary);
 		cursor: pointer;
-		transition: all 0.15s ease;
+		transition: all var(--transition);
+	}
+
+	.unit-btn:hover {
+		border-color: var(--border-default);
+		color: var(--text-primary);
 	}
 
 	.unit-btn.active {
-		color: var(--amber-400);
-		background: rgba(251, 191, 36, 0.1);
+		background: var(--accent);
+		border-color: var(--accent);
+		color: white;
 	}
 
 	/* Inputs */
@@ -1427,7 +1432,7 @@
 
 	.input-field-sm:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	.rssi-input {
@@ -1497,7 +1502,7 @@
 
 	.select-input:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	/* Storage */
@@ -1520,7 +1525,7 @@
 	.stat-value {
 		font-size: 1.25rem;
 		font-weight: 600;
-		color: var(--amber-400);
+		color: var(--accent);
 	}
 
 	.stat-label {
@@ -1581,8 +1586,8 @@
 		padding: 0.625rem 1.25rem;
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: var(--bg-deep);
-		background: var(--amber-400);
+		color: white;
+		background: var(--accent);
 		border: none;
 		border-radius: 0.5rem;
 		cursor: pointer;
@@ -1590,7 +1595,7 @@
 	}
 
 	.btn-primary:hover {
-		background: var(--amber-500);
+		background: var(--accent-hover);
 	}
 
 	.btn-primary:disabled {
@@ -1602,16 +1607,16 @@
 		padding: 0.375rem 0.75rem;
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: var(--amber-400);
-		background: rgba(251, 191, 36, 0.1);
-		border: 1px solid rgba(251, 191, 36, 0.2);
+		color: var(--accent);
+		background: var(--accent-muted);
+		border: 1px solid var(--accent-muted);
 		border-radius: 0.375rem;
 		cursor: pointer;
 		transition: all 0.15s ease;
 	}
 
 	.btn-secondary-sm:hover:not(:disabled) {
-		background: rgba(251, 191, 36, 0.15);
+		background: rgba(59, 130, 246, 0.2);
 	}
 
 	.btn-secondary-sm:disabled {
@@ -1705,7 +1710,7 @@
 		width: 2rem;
 		height: 2rem;
 		border: 2px solid var(--bg-hover);
-		border-top-color: var(--amber-400);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -1714,7 +1719,7 @@
 		width: 1rem;
 		height: 1rem;
 		border: 2px solid var(--bg-hover);
-		border-top-color: var(--amber-400);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -1780,7 +1785,7 @@
 
 	.input-field:focus {
 		outline: none;
-		border-color: var(--amber-400);
+		border-color: var(--accent);
 	}
 
 	.input-field::placeholder {
@@ -2010,9 +2015,9 @@
 	}
 
 	.btn-override.active {
-		background: var(--amber-400);
-		border-color: var(--amber-400);
-		color: var(--bg-deep);
+		background: var(--accent);
+		border-color: var(--accent);
+		color: white;
 	}
 
 	.btn-override.btn-cancel {

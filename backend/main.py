@@ -1,8 +1,12 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Configure logging to show INFO level
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
@@ -15,6 +19,7 @@ from .models import Reading, Tilt
 from .routers import config, system, tilts
 from .cleanup import CleanupService
 from .scanner import TiltReading, TiltScanner
+from .services.calibration import calibration_service
 from .websocket import manager
 
 # Global scanner instance
@@ -43,13 +48,18 @@ async def handle_tilt_reading(reading: TiltReading):
         tilt.last_seen = datetime.utcnow()
         tilt.mac = reading.mac
 
+        # Apply calibration
+        sg_calibrated, temp_calibrated = await calibration_service.calibrate_reading(
+            session, reading.id, reading.sg, reading.temp_f
+        )
+
         # Store reading in DB
         db_reading = Reading(
             tilt_id=reading.id,
             sg_raw=reading.sg,
-            sg_calibrated=reading.sg,  # TODO: apply calibration
+            sg_calibrated=sg_calibrated,
             temp_raw=reading.temp_f,
-            temp_calibrated=reading.temp_f,  # TODO: apply calibration
+            temp_calibrated=temp_calibrated,
             rssi=reading.rssi,
         )
         session.add(db_reading)
@@ -60,9 +70,9 @@ async def handle_tilt_reading(reading: TiltReading):
             "id": reading.id,
             "color": reading.color,
             "beer_name": tilt.beer_name,
-            "sg": reading.sg,
+            "sg": sg_calibrated,
             "sg_raw": reading.sg,
-            "temp": reading.temp_f,
+            "temp": temp_calibrated,
             "temp_raw": reading.temp_f,
             "rssi": reading.rssi,
             "last_seen": datetime.utcnow().isoformat(),

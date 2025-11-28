@@ -18,6 +18,7 @@ from ..models import (
     TiltResponse,
     TiltUpdate,
 )
+from ..services.calibration import calibration_service
 
 router = APIRouter(prefix="/api/tilts", tags=["tilts"])
 
@@ -163,6 +164,10 @@ async def add_calibration_point(
 
     await db.commit()
     await db.refresh(cal_point)
+
+    # Invalidate calibration cache so new points take effect immediately
+    calibration_service.invalidate_cache(tilt_id)
+
     return cal_point
 
 
@@ -187,4 +192,8 @@ async def clear_calibration(
         )
     )
     await db.commit()
+
+    # Invalidate calibration cache so cleared points take effect immediately
+    calibration_service.invalidate_cache(tilt_id)
+
     return {"status": "cleared", "type": cal_type}

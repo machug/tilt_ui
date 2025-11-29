@@ -48,12 +48,12 @@ Access the UI at `http://<raspberry-pi-ip>:8080`
 
 ```bash
 # Copy service file
-sudo cp deploy/tiltui.service /etc/systemd/system/
+sudo cp deploy/brewsignal.service /etc/systemd/system/
 
 # Enable and start
 sudo systemctl daemon-reload
-sudo systemctl enable tiltui
-sudo systemctl start tiltui
+sudo systemctl enable brewsignal
+sudo systemctl start brewsignal
 ```
 
 ## Configuration

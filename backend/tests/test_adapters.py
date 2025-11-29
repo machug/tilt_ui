@@ -4,6 +4,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from backend.ingest.adapters.gravitymon import GravityMonAdapter
 from backend.ingest.adapters.ispindel import ISpindelAdapter
 from backend.ingest.adapters.tilt import TiltAdapter
 from backend.ingest.base import GravityUnit, ReadingStatus, TemperatureUnit
@@ -178,3 +179,62 @@ class TestISpindelAdapter:
         }
         reading = adapter.parse(payload, source_protocol="http")
         assert reading.device_id == "MySpindel"
+
+
+class TestGravityMonAdapter:
+    """Test GravityMon adapter (iSpindel-compatible with extensions)."""
+
+    @pytest.fixture
+    def adapter(self):
+        return GravityMonAdapter()
+
+    def test_can_handle_gravitymon_payload(self, adapter):
+        payload = {
+            "name": "GravityMon",
+            "angle": 25.5,
+            "temperature": 20.0,
+            "corr-gravity": 1.048,
+            "run-time": 12345,
+        }
+        assert adapter.can_handle(payload) is True
+
+    def test_cannot_handle_plain_ispindel(self, adapter):
+        """Plain iSpindel without GravityMon extensions."""
+        payload = {
+            "name": "iSpindel001",
+            "angle": 25.5,
+            "temperature": 20.0,
+            "gravity": 1.048,
+        }
+        assert adapter.can_handle(payload) is False
+
+    def test_parse_with_corrected_gravity(self, adapter):
+        """GravityMon corr-gravity is pre-filtered."""
+        payload = {
+            "name": "GravityMon",
+            "ID": 54321,
+            "angle": 25.5,
+            "temperature": 20.0,
+            "corr-gravity": 1.048,
+            "run-time": 12345,
+        }
+        reading = adapter.parse(payload, source_protocol="mqtt")
+
+        assert reading is not None
+        assert reading.device_type == "gravitymon"
+        assert reading.gravity_raw == 1.048
+        assert reading.is_pre_filtered is True  # Key difference from iSpindel
+
+    def test_parse_falls_back_to_gravity(self, adapter):
+        """Use gravity field if corr-gravity not present."""
+        payload = {
+            "name": "GravityMon",
+            "angle": 25.5,
+            "temperature": 20.0,
+            "gravity": 1.050,
+            "run-time": 12345,
+        }
+        reading = adapter.parse(payload, source_protocol="http")
+
+        assert reading.gravity_raw == 1.050
+        assert reading.is_pre_filtered is False  # Regular gravity, not filtered

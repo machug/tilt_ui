@@ -1,5 +1,6 @@
 """Universal hydrometer ingest layer."""
 
+from .adapters import BaseAdapter
 from .base import (
     GravityUnit,
     HydrometerReading,
@@ -15,6 +16,7 @@ from .units import (
 )
 
 __all__ = [
+    "BaseAdapter",
     "GravityUnit",
     "HydrometerReading",
     "ReadingStatus",

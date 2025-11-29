@@ -2,9 +2,9 @@
 BLE Scanner for Tilt Hydrometers.
 
 Supports four modes:
-1. Mock mode (TILT_MOCK=true): Generates fake readings for development
-2. File mode (TILT_FILES=<path>): Reads from local TiltPi JSON files
-3. Relay mode (TILT_RELAY=<ip>): Fetches from remote TiltPi
+1. Mock mode (SCANNER_MOCK=true): Generates fake readings for development
+2. File mode (SCANNER_FILES_PATH=<path>): Reads from local TiltPi JSON files
+3. Relay mode (SCANNER_RELAY_HOST=<ip>): Fetches from remote TiltPi
 4. Real mode: Scans BLE for actual Tilt devices
 """
 
@@ -274,16 +274,16 @@ class TiltScanner:
         self._scanner: MockScanner | FileScanner | RelayScanner | BLEScanner
 
         # Select mode based on environment
-        if os.environ.get("TILT_MOCK", "").lower() in ("true", "1", "yes"):
+        if os.environ.get("SCANNER_MOCK", "").lower() in ("true", "1", "yes"):
             logger.info("Scanner mode: MOCK")
             self._scanner = MockScanner()
             self._interval = 5.0  # Mock every 5 seconds
-        elif files_path := os.environ.get("TILT_FILES"):
+        elif files_path := os.environ.get("SCANNER_FILES_PATH"):
             # File mode: read from local TiltPi JSON files
             logger.info("Scanner mode: FILES (%s)", files_path)
             self._scanner = FileScanner(files_path)
             self._interval = 5.0  # Check files every 5 seconds
-        elif relay_host := os.environ.get("TILT_RELAY"):
+        elif relay_host := os.environ.get("SCANNER_RELAY_HOST"):
             logger.info("Scanner mode: RELAY (%s)", relay_host)
             self._scanner = RelayScanner(relay_host)
             self._interval = 5.0

@@ -115,12 +115,14 @@
 			}
 		}
 
-		// Attenuation and ABV (require OG)
+		// Attenuation and ABV
+		// Use explicit OG if set, otherwise estimate from highSg (95th percentile)
 		let apparentAttenuation: number | null = null;
 		let abv: number | null = null;
-		const og = originalGravity;
+		const og = originalGravity ?? highSg;
+		const ogIsEstimated = originalGravity === null;
 
-		if (og !== null && og > 1.0) {
+		if (og > 1.0 && og > currentSg) {
 			// Apparent attenuation = (OG - FG) / (OG - 1) * 100
 			apparentAttenuation = ((og - currentSg) / (og - 1.0)) * 100;
 			// Standard ABV formula
@@ -140,7 +142,9 @@
 			durationDays,
 			daysAtCurrentSg,
 			apparentAttenuation,
-			abv
+			abv,
+			ogIsEstimated,
+			effectiveOg: og
 		};
 	});
 
@@ -273,8 +277,11 @@
 						maxlength="5"
 					/>
 				{:else}
-					<button type="button" class="og-btn" onclick={startEditingOg} title="Click to set Original Gravity">
-						<span class="stat-value">{originalGravity ? formatSg(originalGravity) : '--'}</span>
+					<button type="button" class="og-btn" onclick={startEditingOg} title={stats.ogIsEstimated ? "Estimated from high reading - click to set actual OG" : "Click to edit Original Gravity"}>
+						<span class="stat-value" class:estimated={stats.ogIsEstimated}>{formatSg(stats.effectiveOg)}</span>
+						{#if stats.ogIsEstimated}
+							<span class="estimated-badge">est</span>
+						{/if}
 						<svg class="edit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
 						</svg>
@@ -424,6 +431,21 @@
 		border-radius: 0.25rem;
 		padding: 0.125rem 0.25rem;
 		outline: none;
+	}
+
+	.stat-value.estimated {
+		color: var(--text-secondary);
+		font-style: italic;
+	}
+
+	.estimated-badge {
+		font-size: 0.5rem;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		background: var(--bg-surface);
+		padding: 0.0625rem 0.1875rem;
+		border-radius: 0.1875rem;
+		margin-left: 0.125rem;
 	}
 
 	.stats-empty {

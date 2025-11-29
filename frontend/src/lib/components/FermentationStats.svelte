@@ -8,6 +8,16 @@
 	const TEMP_MIN_F = 32; // Fahrenheit
 	const TEMP_MAX_F = 212;
 
+	// Percentile helper - filters out noise spikes from High/Low stats
+	function percentile(arr: number[], p: number): number {
+		const sorted = [...arr].sort((a, b) => a - b);
+		const idx = (p / 100) * (sorted.length - 1);
+		const lower = Math.floor(idx);
+		const upper = Math.ceil(idx);
+		if (lower === upper) return sorted[lower];
+		return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
+	}
+
 	interface Props {
 		readings: HistoricalReading[];
 		originalGravity: number | null;
@@ -62,8 +72,9 @@
 
 		const currentSg = sgValues[sgValues.length - 1];
 		const firstSg = sgValues[0];
-		const highSg = Math.max(...sgValues);
-		const lowSg = Math.min(...sgValues);
+		// Use percentiles to filter noise spikes (Tilt can report bad values when bumped)
+		const highSg = percentile(sgValues, 95);
+		const lowSg = percentile(sgValues, 5);
 
 		// Duration in days
 		const firstTime = new Date(firstReading.timestamp).getTime();
@@ -83,8 +94,9 @@
 		if (tempValues.length > 0) {
 			const lastTempF = tempValues[tempValues.length - 1];
 			const avgTempF = tempValues.reduce((a, b) => a + b, 0) / tempValues.length;
-			const highTempF = Math.max(...tempValues);
-			const lowTempF = Math.min(...tempValues);
+			// Use percentiles for High/Low to filter noise
+			const highTempF = percentile(tempValues, 95);
+			const lowTempF = percentile(tempValues, 5);
 
 			currentTemp = useCelsius ? fahrenheitToCelsius(lastTempF) : lastTempF;
 			avgTemp = useCelsius ? fahrenheitToCelsius(avgTempF) : avgTempF;

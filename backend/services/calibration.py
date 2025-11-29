@@ -256,7 +256,8 @@ class CalibrationService:
 
             elif calibration_type == "linear":
                 # Linear interpolation between points
-                sg_points = calibration_data.get("sg_points", [])
+                # API stores as "points", also support legacy "sg_points"
+                sg_points = calibration_data.get("points") or calibration_data.get("sg_points", [])
                 if sg_points:
                     points = [(p[0], p[1]) for p in sg_points]
                     reading.gravity = linear_interpolate(reading.gravity, points)

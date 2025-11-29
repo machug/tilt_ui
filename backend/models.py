@@ -79,7 +79,6 @@ class Device(Base):
     # Relationships
     readings: Mapped[list["Reading"]] = relationship(back_populates="device", cascade="all, delete-orphan")
 
-
 class Reading(Base):
     __tablename__ = "readings"
     __table_args__ = (

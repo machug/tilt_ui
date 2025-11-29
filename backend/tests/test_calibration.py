@@ -100,3 +100,41 @@ class TestPolynomialCalibration:
 
         # No coefficients = no transformation
         assert result == 0.0
+
+
+class TestLinearCalibrationIngest:
+    """Test linear calibration works through calibrate_device_reading."""
+
+    @pytest.mark.asyncio
+    async def test_linear_calibration_with_points_key(self):
+        """Verify linear calibration uses 'points' key from API."""
+        from unittest.mock import MagicMock
+
+        service = CalibrationService()
+
+        # Create a mock device with linear calibration using "points" key
+        device = MagicMock()
+        device.calibration_type = "linear"
+        device.calibration_data = {
+            "points": [[1.000, 1.002], [1.050, 1.048]]  # Raw -> Actual
+        }
+
+        # Create a reading with raw gravity
+        reading = HydrometerReading(
+            device_id="test",
+            device_type="ispindel",
+            timestamp=datetime.now(timezone.utc),
+            gravity=1.025,  # Between the two points
+        )
+
+        # Apply calibration
+        result = await service.calibrate_device_reading(
+            db=None,  # Not used for linear calibration
+            device=device,
+            reading=reading,
+        )
+
+        # Linear interpolation: at 1.025, should be between 1.002 and 1.048
+        # Slope = (1.048 - 1.002) / (1.050 - 1.000) = 0.046 / 0.050 = 0.92
+        # Expected = 1.002 + (1.025 - 1.000) * 0.92 = 1.002 + 0.023 = 1.025
+        assert result.gravity == pytest.approx(1.025, abs=0.001)

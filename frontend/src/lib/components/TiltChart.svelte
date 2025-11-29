@@ -26,7 +26,6 @@
 
 	// System timezone for chart display
 	let systemTimezone = $state<string>('UTC');
-	let mounted = $state(false);
 	let lastLoadTime = $state(0);
 	let refreshMinutes = $state<number>(3);
 
@@ -484,7 +483,6 @@ onMount(async () => {
 
 		// Initial load is user-triggered (mounting the component)
 		await loadData(true);
-		mounted = true;
 		window.addEventListener('resize', handleResize);
 		resetRefreshInterval();
 	});
@@ -495,19 +493,6 @@ onMount(async () => {
 		if (refreshInterval) {
 			clearInterval(refreshInterval);
 		}
-	});
-
-	// Track previous range to detect actual changes
-	let prevRange = $state<number | null>(null);
-
-	// Reload when range CHANGES (not on initial mount - that's handled by onMount)
-	$effect(() => {
-		const currentRange = selectedRange;
-		if (mounted && prevRange !== null && prevRange !== currentRange) {
-			// Range actually changed - user triggered action
-			loadData(true);
-		}
-		prevRange = currentRange;
 	});
 
 	// Re-render chart when temp units or smoothing settings change
@@ -545,7 +530,12 @@ onMount(async () => {
 					type="button"
 					class="range-btn"
 					class:active={selectedRange === range.hours}
-					onclick={() => (selectedRange = range.hours)}
+					onclick={() => {
+						if (selectedRange !== range.hours) {
+							selectedRange = range.hours;
+							loadData(true);
+						}
+					}}
 				>
 					{range.label}
 				</button>

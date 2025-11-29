@@ -1,7 +1,7 @@
 [project]
-name = "tilt-ui"
+name = "brewsignal"
 version = "1.0.0"
-description = "Modern web UI for Tilt Hydrometer monitoring"
+description = "Modern web UI for BrewSignal Hydrometer monitoring"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104",

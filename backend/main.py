@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
     global scanner, scanner_task, cleanup_service
 
     # Startup
-    print("Starting Tilt UI...")
+    print("Starting BrewSignal...")
     await init_db()
     print("Database initialized")
 
@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    print("Shutting down Tilt UI...")
+    print("Shutting down BrewSignal...")
     stop_temp_controller()
     stop_ambient_poller()
     if cleanup_service:
@@ -132,7 +132,7 @@ async def lifespan(app: FastAPI):
 
 
 from .routers.system import VERSION
-app = FastAPI(title="Tilt UI", version=VERSION, lifespan=lifespan)
+app = FastAPI(title="BrewSignal", version=VERSION, lifespan=lifespan)
 
 # Register routers
 app.include_router(tilts.router)

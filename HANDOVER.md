@@ -1,4 +1,4 @@
-# Tilt UI Project Handover
+# BrewSignal Project Handover
 
 ## Quick Start for New Session
 
@@ -50,14 +50,14 @@ FastAPI app
 - Can relay readings to dev machine
 
 **Scanner modes:**
-1. `TILT_MOCK=true` - Fake data (default for dev)
-2. `TILT_RELAY=192.168.4.117` - Fetch from remote TiltPi
+1. `SCANNER_MOCK=true` - Fake data (default for dev)
+2. `SCANNER_RELAY_HOST=192.168.4.117` - Fetch from remote TiltPi
 3. Normal - Local BLE (production)
 
 ## Project Structure (to create)
 
 ```
-tilt_ui/
+brewsignal/
 ├── backend/
 │   ├── main.py
 │   ├── scanner.py

@@ -1,9 +1,35 @@
 # Changelog
 
-All notable changes to Tilt UI will be documented in this file.
+All notable changes to BrewSignal will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] - 2025-11-29
+
+### Changed
+- **Project Rebrand** - Renamed from "Tilt UI" to "BrewSignal" to reflect multi-device support
+
+### BREAKING CHANGES
+
+#### Environment Variables
+- `TILT_MOCK` → `SCANNER_MOCK`
+- `TILT_FILES` → `SCANNER_FILES_PATH`
+- `TILT_RELAY` → `SCANNER_RELAY_HOST`
+
+#### File Paths
+- Database file renamed: `tiltui.db` → `fermentation.db`
+- Log file renamed: `tiltui.log` → `brewsignal.log`
+
+#### System Service
+- Systemd service renamed: `tiltui.service` → `brewsignal.service`
+- Service users must reinstall/rename service files
+
+#### Migration Notes
+- Update environment variables in your deployment configuration
+- Rename database file: `mv tiltui.db fermentation.db`
+- Reinstall systemd service with new name
+- Update any automation/scripts referencing old names
 
 ## [1.3.0] - 2025-11-29
 

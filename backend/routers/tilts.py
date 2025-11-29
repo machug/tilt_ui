@@ -84,8 +84,8 @@ async def get_readings(
     """Get historical readings for a Tilt.
 
     Use `hours` for quick time ranges, or `start`/`end` for custom ranges.
-    Results are ordered by timestamp descending (newest first).
-    Default limit is 1000 readings to prevent overwhelming responses.
+    Results are downsampled to return evenly-spaced readings across the time range.
+    Default limit is 1000 readings.
     """
     # Verify Tilt exists
     tilt = await db.get(Tilt, tilt_id)
@@ -102,11 +102,37 @@ async def get_readings(
     if end:
         query = query.where(Reading.timestamp <= end)
 
-    # Order by timestamp descending and apply limit
-    query = query.order_by(desc(Reading.timestamp)).limit(limit)
+    # Get total count in the time range to determine downsampling
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(Reading).where(Reading.tilt_id == tilt_id)
+    if start:
+        count_query = count_query.where(Reading.timestamp >= start)
+    if end:
+        count_query = count_query.where(Reading.timestamp <= end)
 
-    result = await db.execute(query)
-    return result.scalars().all()
+    count_result = await db.execute(count_query)
+    total_count = count_result.scalar() or 0
+
+    # If total readings exceed limit, downsample by selecting every Nth reading
+    if total_count > limit:
+        # Use a subquery with row numbers to get evenly spaced samples
+        # This ensures we span the full time range instead of just getting recent data
+        step = total_count // limit
+
+        # Order by timestamp ascending, then reverse at the end for descending output
+        query = query.order_by(Reading.timestamp.asc())
+        result = await db.execute(query)
+        all_readings = result.scalars().all()
+
+        # Sample every Nth reading to get evenly distributed points
+        sampled = all_readings[::step][:limit]
+        # Return in descending order (newest first)
+        return list(reversed(sampled))
+    else:
+        # No downsampling needed
+        query = query.order_by(desc(Reading.timestamp)).limit(limit)
+        result = await db.execute(query)
+        return result.scalars().all()
 
 
 # Calibration endpoints

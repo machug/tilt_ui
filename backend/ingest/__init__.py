@@ -7,6 +7,7 @@ from .base import (
     ReadingStatus,
     TemperatureUnit,
 )
+from .router import AdapterRouter
 from .units import (
     celsius_to_fahrenheit,
     fahrenheit_to_celsius,
@@ -16,6 +17,7 @@ from .units import (
 )
 
 __all__ = [
+    "AdapterRouter",
     "BaseAdapter",
     "GravityUnit",
     "HydrometerReading",

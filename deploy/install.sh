@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 INSTALL_DIR="/opt/brewsignal"
 SERVICE_FILE="/etc/systemd/system/brewsignal.service"
-REPO_URL="https://github.com/yourusername/brewsignal.git"
+REPO_URL="https://github.com/machug/brewsignal.git"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  BrewSignal Installation Script${NC}"

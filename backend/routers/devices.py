@@ -1,16 +1,16 @@
 """Device API endpoints for universal hydrometer device registry."""
 
-import json
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Device
+from ..services.calibration import calibration_service
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -145,6 +145,99 @@ class DeviceResponse(BaseModel):
         )
 
 
+class CalibrationRequest(BaseModel):
+    """Schema for setting device calibration."""
+    calibration_type: str
+    calibration_data: Optional[dict[str, Any]] = None
+
+    @field_validator("calibration_type")
+    @classmethod
+    def validate_calibration_type(cls, v: str) -> str:
+        valid_types = {"none", "offset", "linear", "polynomial"}
+        if v not in valid_types:
+            raise ValueError(f"calibration_type must be one of: {', '.join(valid_types)}")
+        return v
+
+    @model_validator(mode="after")
+    def validate_calibration_data(self) -> "CalibrationRequest":
+        """Validate calibration_data structure matches calibration_type."""
+        cal_type = self.calibration_type
+        cal_data = self.calibration_data
+
+        if cal_type == "none":
+            # None type should have no data
+            if cal_data is not None:
+                raise ValueError("calibration_type 'none' should not have calibration_data")
+
+        elif cal_type == "offset":
+            # Offset requires sg_offset and/or temp_offset
+            if cal_data is None:
+                raise ValueError("calibration_type 'offset' requires calibration_data")
+            if "sg_offset" not in cal_data and "temp_offset" not in cal_data:
+                raise ValueError("offset calibration requires 'sg_offset' and/or 'temp_offset'")
+            # Validate types
+            if "sg_offset" in cal_data and not isinstance(cal_data["sg_offset"], (int, float)):
+                raise ValueError("sg_offset must be a number")
+            if "temp_offset" in cal_data and not isinstance(cal_data["temp_offset"], (int, float)):
+                raise ValueError("temp_offset must be a number")
+
+        elif cal_type == "linear":
+            # Linear requires points array
+            if cal_data is None:
+                raise ValueError("calibration_type 'linear' requires calibration_data")
+            if "points" not in cal_data:
+                raise ValueError("linear calibration requires 'points' array")
+            points = cal_data["points"]
+            if not isinstance(points, list) or len(points) < 2:
+                raise ValueError("linear calibration requires at least 2 points")
+            # Validate point structure: [[raw1, actual1], [raw2, actual2], ...]
+            for point in points:
+                if not isinstance(point, list) or len(point) != 2:
+                    raise ValueError("each point must be [raw_value, actual_value]")
+                if not all(isinstance(v, (int, float)) for v in point):
+                    raise ValueError("point values must be numbers")
+
+        elif cal_type == "polynomial":
+            # Polynomial requires coefficients array
+            if cal_data is None:
+                raise ValueError("calibration_type 'polynomial' requires calibration_data")
+            if "coefficients" not in cal_data:
+                raise ValueError("polynomial calibration requires 'coefficients' array")
+            coefficients = cal_data["coefficients"]
+            if not isinstance(coefficients, list) or len(coefficients) < 1:
+                raise ValueError("polynomial calibration requires at least 1 coefficient")
+            if not all(isinstance(c, (int, float)) for c in coefficients):
+                raise ValueError("all coefficients must be numbers")
+
+        return self
+
+
+class CalibrationResponse(BaseModel):
+    """Schema for calibration response."""
+    calibration_type: str
+    calibration_data: Optional[dict[str, Any]]
+
+
+class CalibrationTestRequest(BaseModel):
+    """Schema for testing calibration with raw values."""
+    angle: Optional[float] = None
+    raw_gravity: Optional[float] = None
+    raw_temperature: Optional[float] = None
+
+    @model_validator(mode="after")
+    def validate_at_least_one(self) -> "CalibrationTestRequest":
+        """Ensure at least one input value is provided."""
+        if self.angle is None and self.raw_gravity is None and self.raw_temperature is None:
+            raise ValueError("at least one of 'angle', 'raw_gravity', or 'raw_temperature' must be provided")
+        return self
+
+
+class CalibrationTestResponse(BaseModel):
+    """Schema for calibration test response."""
+    calibrated_gravity: Optional[float] = None
+    calibrated_temperature: Optional[float] = None
+
+
 # API Endpoints
 @router.get("", response_model=list[DeviceResponse])
 async def list_devices(
@@ -261,3 +354,142 @@ async def delete_device(device_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"status": "deleted", "device_id": device_id}
+
+
+# Calibration Endpoints
+@router.put("/{device_id}/calibration", response_model=CalibrationResponse)
+async def set_calibration(
+    device_id: str,
+    calibration: CalibrationRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Set calibration type and data for a device.
+
+    Calibration types:
+    - none: No calibration applied
+    - offset: Simple offset calibration {"sg_offset": 0.002, "temp_offset": 1.0}
+    - linear: Two-point linear {"points": [[raw1, actual1], [raw2, actual2]]}
+    - polynomial: iSpindel-style polynomial {"coefficients": [a, b, c, ...]}
+    """
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    # Update calibration
+    device.calibration_type = calibration.calibration_type
+    device.calibration_data = calibration.calibration_data
+
+    await db.commit()
+    await db.refresh(device)
+
+    return CalibrationResponse(
+        calibration_type=device.calibration_type,
+        calibration_data=device.calibration_data,
+    )
+
+
+@router.get("/{device_id}/calibration", response_model=CalibrationResponse)
+async def get_calibration(
+    device_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get current calibration settings for a device."""
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    return CalibrationResponse(
+        calibration_type=device.calibration_type,
+        calibration_data=device.calibration_data,
+    )
+
+
+@router.post("/{device_id}/calibration/test", response_model=CalibrationTestResponse)
+async def test_calibration(
+    device_id: str,
+    test_data: CalibrationTestRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Test calibration by providing raw values and getting calibrated results.
+
+    Provide one or more of:
+    - angle: Tilt angle (for polynomial calibration)
+    - raw_gravity: Raw specific gravity value
+    - raw_temperature: Raw temperature value
+
+    Returns the calibrated gravity and/or temperature based on the device's
+    current calibration settings.
+    """
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    calibration_type = device.calibration_type or "none"
+    calibration_data = device.calibration_data or {}
+
+    response = CalibrationTestResponse()
+
+    # Test gravity calibration
+    if test_data.raw_gravity is not None or test_data.angle is not None:
+        gravity = test_data.raw_gravity
+
+        if calibration_type == "offset":
+            # Apply offset
+            if gravity is not None:
+                sg_offset = calibration_data.get("sg_offset", 0.0)
+                response.calibrated_gravity = gravity + sg_offset
+
+        elif calibration_type == "polynomial":
+            # Apply polynomial from angle
+            if test_data.angle is not None:
+                coefficients = calibration_data.get("coefficients", [])
+                if coefficients:
+                    response.calibrated_gravity = calibration_service.apply_polynomial(
+                        test_data.angle, coefficients
+                    )
+            elif gravity is not None:
+                # No angle provided but have gravity - just return it
+                response.calibrated_gravity = gravity
+
+        elif calibration_type == "linear":
+            # Apply linear interpolation
+            if gravity is not None:
+                points_data = calibration_data.get("points", [])
+                if points_data:
+                    from ..services.calibration import linear_interpolate
+                    points = [(p[0], p[1]) for p in points_data]
+                    response.calibrated_gravity = linear_interpolate(gravity, points)
+
+        elif calibration_type == "none":
+            # No calibration
+            if test_data.angle is not None:
+                # Can't process angle without calibration
+                response.calibrated_gravity = None
+            elif gravity is not None:
+                response.calibrated_gravity = gravity
+
+    # Test temperature calibration
+    if test_data.raw_temperature is not None:
+        temperature = test_data.raw_temperature
+
+        if calibration_type in ("offset", "polynomial"):
+            # Apply offset
+            temp_offset = calibration_data.get("temp_offset", 0.0)
+            response.calibrated_temperature = temperature + temp_offset
+
+        elif calibration_type == "linear":
+            # Apply linear interpolation if temp_points exist
+            temp_points_data = calibration_data.get("temp_points", [])
+            if temp_points_data:
+                from ..services.calibration import linear_interpolate
+                points = [(p[0], p[1]) for p in temp_points_data]
+                response.calibrated_temperature = linear_interpolate(temperature, points)
+            else:
+                # No temp points - return uncalibrated
+                response.calibrated_temperature = temperature
+
+        elif calibration_type == "none":
+            # No calibration
+            response.calibrated_temperature = temperature
+
+    return response

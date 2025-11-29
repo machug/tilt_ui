@@ -15,12 +15,12 @@ class TestIngestManagerAutoRegistration:
 
     async def test_tilt_auto_registration(self, test_db: AsyncSession):
         """Test auto-registration for Tilt device on first reading."""
-        # Tilt payload example (BLE format)
+        # Tilt payload example (BLE iBeacon format - lowercase keys)
         payload = {
             "color": "RED",
             "temp_f": 68,
             "sg": 1.050,
-            "rssi": -75,
+            "rssi": -65,
         }
 
         # Verify no device exists initially
@@ -54,7 +54,7 @@ class TestIngestManagerAutoRegistration:
 
     async def test_ispindel_auto_registration(self, test_db: AsyncSession):
         """Test auto-registration for iSpindel device on first reading."""
-        # iSpindel payload example
+        # iSpindel payload example - note: ID field (numeric) is preferred as device_id
         payload = {
             "name": "iSpindel001",
             "ID": 123456,
@@ -67,8 +67,11 @@ class TestIngestManagerAutoRegistration:
             "RSSI": -65,
         }
 
+        # Device ID will be the numeric ID field as string
+        expected_device_id = "123456"
+
         # Verify no device exists initially
-        result = await test_db.execute(select(Device).where(Device.id == "iSpindel001"))
+        result = await test_db.execute(select(Device).where(Device.id == expected_device_id))
         device = result.scalar_one_or_none()
         assert device is None
 
@@ -83,14 +86,14 @@ class TestIngestManagerAutoRegistration:
         assert reading is not None
         assert reading.device_type == "ispindel"
 
-        # Verify device was auto-registered
-        result = await test_db.execute(select(Device).where(Device.id == "123456"))
+        # Verify device was auto-registered (ID is used as device_id)
+        result = await test_db.execute(select(Device).where(Device.id == expected_device_id))
         device = result.scalar_one_or_none()
         assert device is not None
-        assert device.id == "123456"
+        assert device.id == expected_device_id
         assert device.device_type == "ispindel"
-        assert device.name == "123456"
-        assert device.native_gravity_unit == "sg"  # iSpindel default is SG
+        assert device.name == expected_device_id  # Name is set to device_id
+        assert device.native_gravity_unit == "sg"  # Stored as SG after conversion
         assert device.native_temp_unit == "c"
         assert device.calibration_type == "none"
         assert device.last_seen is not None
@@ -98,23 +101,26 @@ class TestIngestManagerAutoRegistration:
 
     async def test_gravitymon_auto_registration(self, test_db: AsyncSession):
         """Test auto-registration for GravityMon device on first reading."""
-        # GravityMon payload example (needs corr-gravity or run-time to be detected as GravityMon)
+        # GravityMon payload - must have 'corr-gravity' or 'run-time' to be detected as GravityMon
+        # Otherwise it's detected as iSpindel (which is parent format)
         payload = {
             "name": "gravmon01",
             "ID": "GM001",
             "angle": 30.2,
-            "temperature": 20.5,  # GravityMon native is Celsius
-            "temp-units": "C",
+            "temperature": 20.5,  # Celsius by default
+            "temp_units": "C",
             "battery": 4.1,
             "gravity": 1.048,
-            "corr-gravity": 1.048,  # This marks it as GravityMon
-            "gravity-unit": "G",
-            "interval": 600,
+            "corr-gravity": 1.048,  # This makes it GravityMon
+            "run-time": 3600,  # Also makes it GravityMon
             "RSSI": -58,
         }
 
+        # Device ID will be the ID field
+        expected_device_id = "GM001"
+
         # Verify no device exists initially
-        result = await test_db.execute(select(Device).where(Device.id == "gravmon01"))
+        result = await test_db.execute(select(Device).where(Device.id == expected_device_id))
         device = result.scalar_one_or_none()
         assert device is None
 
@@ -130,14 +136,14 @@ class TestIngestManagerAutoRegistration:
         assert reading.device_type == "gravitymon"
 
         # Verify device was auto-registered
-        result = await test_db.execute(select(Device).where(Device.id == "GM001"))
+        result = await test_db.execute(select(Device).where(Device.id == expected_device_id))
         device = result.scalar_one_or_none()
         assert device is not None
-        assert device.id == "GM001"
+        assert device.id == expected_device_id
         assert device.device_type == "gravitymon"
-        assert device.name == "GM001"
+        assert device.name == expected_device_id
         assert device.native_gravity_unit == "sg"
-        assert device.native_temp_unit == "c"  # GravityMon native is Celsius
+        assert device.native_temp_unit == "c"  # Default is Celsius
         assert device.calibration_type == "none"
         assert device.last_seen is not None
         assert device.battery_voltage == 4.1
@@ -149,6 +155,7 @@ class TestIngestManagerAutoRegistration:
             "color": "BLUE",
             "temp_f": 68,
             "sg": 1.050,
+            "rssi": -65,
         }
 
         reading1 = await ingest_manager.ingest(
@@ -174,6 +181,7 @@ class TestIngestManagerAutoRegistration:
             "color": "BLUE",
             "temp_f": 70,
             "sg": 1.048,
+            "rssi": -62,
         }
 
         reading2 = await ingest_manager.ingest(
@@ -193,7 +201,7 @@ class TestIngestManagerAutoRegistration:
         device2 = result.scalar_one_or_none()
         assert device2 is not None
         assert device2.id == device1.id
-        # Note: last_seen should be updated, but we can't reliably test exact timing
+        # last_seen should exist (don't compare timestamps due to timezone complexities)
         assert device2.last_seen is not None
 
         # Verify two readings exist
@@ -218,7 +226,7 @@ class TestIngestManagerAutoRegistration:
         assert tilt_device is not None
         assert tilt_device.device_type == "tilt"
 
-        # Test iSpindel
+        # Test iSpindel (ID field is used as device_id)
         ispindel_payload = {
             "name": "iSpindel002",
             "ID": 123457,
@@ -235,17 +243,16 @@ class TestIngestManagerAutoRegistration:
         assert ispindel_device is not None
         assert ispindel_device.device_type == "ispindel"
 
-        # Test GravityMon
+        # Test GravityMon (needs corr-gravity or run-time to distinguish from iSpindel)
         gravmon_payload = {
             "name": "gravmon02",
             "ID": "GM002",
             "angle": 30.2,
             "temperature": 20.5,
-            "temp-units": "C",
+            "temp_units": "C",
             "battery": 4.1,
             "gravity": 1.048,
-            "corr-gravity": 1.048,  # Marks as GravityMon
-            "gravity-unit": "G",
+            "corr-gravity": 1.048,  # This makes it GravityMon
         }
         await ingest_manager.ingest(db=test_db, payload=gravmon_payload)
 
@@ -256,7 +263,7 @@ class TestIngestManagerAutoRegistration:
 
     async def test_battery_voltage_updated(self, test_db: AsyncSession):
         """Test that battery voltage is updated with each reading."""
-        # First reading with battery
+        # First reading with battery (ID field used as device_id)
         payload1 = {
             "name": "iSpindel003",
             "ID": 123458,
@@ -379,11 +386,10 @@ class TestIngestManagerAutoRegistration:
             "ID": "GM003",
             "angle": 30.2,
             "temperature": 20.5,
-            "temp-units": "C",
+            "temp_units": "C",
             "battery": 4.1,
             "gravity": 1.048,
-            "corr-gravity": 1.048,  # Marks as GravityMon
-            "gravity-unit": "G",
+            "corr-gravity": 1.048,  # Required for GravityMon detection
         }
 
         # Ingest all three
@@ -396,7 +402,7 @@ class TestIngestManagerAutoRegistration:
         devices = result.scalars().all()
         assert len(devices) == 3
 
-        # Verify each device has correct type
+        # Verify each device has correct type (note: ID field is used for iSpindel/GravityMon)
         device_types = {d.id: d.device_type for d in devices}
         assert device_types["YELLOW"] == "tilt"
         assert device_types["123459"] == "ispindel"

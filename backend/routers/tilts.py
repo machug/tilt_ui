@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -113,21 +113,63 @@ async def get_readings(
     count_result = await db.execute(count_query)
     total_count = count_result.scalar() or 0
 
-    # If total readings exceed limit, downsample by selecting every Nth reading
+    # If total readings exceed limit, downsample using database-level ROW_NUMBER()
+    # This avoids loading all readings into memory
     if total_count > limit:
-        # Use a subquery with row numbers to get evenly spaced samples
-        # This ensures we span the full time range instead of just getting recent data
         step = total_count // limit
 
-        # Order by timestamp ascending, then reverse at the end for descending output
-        query = query.order_by(Reading.timestamp.asc())
-        result = await db.execute(query)
-        all_readings = result.scalars().all()
+        # Build WHERE clause for raw SQL
+        where_parts = ["tilt_id = :tilt_id"]
+        params = {"tilt_id": tilt_id, "step": step, "limit": limit}
 
-        # Sample every Nth reading to get evenly distributed points
-        sampled = all_readings[::step][:limit]
-        # Return in descending order (newest first)
-        return list(reversed(sampled))
+        if start:
+            where_parts.append("timestamp >= :start")
+            params["start"] = start
+        if end:
+            where_parts.append("timestamp <= :end")
+            params["end"] = end
+
+        where_clause = " AND ".join(where_parts)
+
+        # Use ROW_NUMBER() window function to sample every Nth row at database level
+        # This only transfers ~limit rows from database to Python
+        sql = text(f"""
+            SELECT * FROM (
+                SELECT *, ROW_NUMBER() OVER (ORDER BY timestamp ASC) as rn
+                FROM readings
+                WHERE {where_clause}
+            ) WHERE (rn - 1) % :step = 0
+            ORDER BY timestamp DESC
+            LIMIT :limit
+        """)
+
+        result = await db.execute(sql, params)
+        rows = result.fetchall()
+
+        # Convert raw rows to Reading objects for Pydantic serialization
+        readings = []
+        for row in rows:
+            # Map row to Reading model (exclude rn column)
+            reading = Reading(
+                id=row.id,
+                device_id=row.device_id,
+                device_type=row.device_type,
+                tilt_id=row.tilt_id,
+                timestamp=row.timestamp,
+                sg_raw=row.sg_raw,
+                sg_calibrated=row.sg_calibrated,
+                temp_raw=row.temp_raw,
+                temp_calibrated=row.temp_calibrated,
+                rssi=row.rssi,
+                battery_voltage=row.battery_voltage,
+                battery_percent=row.battery_percent,
+                angle=row.angle,
+                source_protocol=row.source_protocol,
+                status=row.status,
+                is_pre_filtered=row.is_pre_filtered,
+            )
+            readings.append(reading)
+        return readings
     else:
         # No downsampling needed
         query = query.order_by(desc(Reading.timestamp)).limit(limit)

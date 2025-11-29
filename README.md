@@ -1,15 +1,16 @@
 # Tilt UI
 
-A modern web interface for monitoring Tilt Hydrometer fermentation data on Raspberry Pi.
+A modern web interface for monitoring fermentation hydrometers on Raspberry Pi. Supports Tilt, iSpindel, and GravityMon devices.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Features
 
+- **Multi-Device Support** - Tilt (BLE), iSpindel (HTTP), GravityMon (HTTP) hydrometers
 - **Real-time Monitoring** - Live SG and temperature readings via WebSocket
 - **Historical Charts** - Interactive uPlot charts with 1H/6H/24H/7D/30D time ranges
-- **Calibration** - Linear interpolation between calibration points for SG and temperature
-- **Multi-Tilt Support** - Monitor multiple Tilts simultaneously (Red, Green, Black, Purple, Orange, Blue, Yellow, Pink)
+- **Calibration** - Linear interpolation (Tilt) and polynomial calibration (iSpindel)
+- **Unit Conversion** - Automatic Plato↔SG and Celsius↔Fahrenheit
 - **Home Assistant Integration** - Display ambient temperature/humidity from HA sensors
 - **Temperature Control** - Automatic heater control via HA switch with hysteresis and manual override
 - **Weather Alerts** - Predictive alerts when forecast temps may affect fermentation
@@ -20,8 +21,8 @@ A modern web interface for monitoring Tilt Hydrometer fermentation data on Raspb
 
 - Raspberry Pi (3B+ or newer recommended)
 - Python 3.11+
-- Bluetooth adapter (built-in or USB)
-- Tilt Hydrometer
+- Bluetooth adapter (built-in or USB) for Tilt devices
+- Supported hydrometer: Tilt, iSpindel, or GravityMon
 
 ## Quick Start
 
@@ -76,9 +77,14 @@ sudo systemctl start tiltui
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/api/devices` | GET/POST | List or register devices |
+| `/api/devices/{id}` | GET/PUT/DELETE | Device management |
+| `/api/devices/{id}/calibration` | GET/PUT | Device calibration data |
+| `/api/ingest/generic` | POST | Auto-detect device format |
+| `/api/ingest/ispindel` | POST | iSpindel HTTP endpoint |
+| `/api/ingest/gravitymon` | POST | GravityMon HTTP endpoint |
 | `/api/tilts` | GET | List all detected Tilts |
-| `/api/tilts/{id}` | GET | Get specific Tilt |
-| `/api/tilts/{id}` | PUT | Update Tilt (beer name) |
+| `/api/tilts/{id}` | GET/PUT | Get or update Tilt |
 | `/api/tilts/{id}/readings` | GET | Historical readings |
 | `/api/tilts/{id}/calibration` | GET/POST | Calibration points |
 | `/api/config` | GET/PATCH | Application settings |
@@ -89,6 +95,16 @@ sudo systemctl start tiltui
 | `/api/alerts` | GET | Weather forecast and alerts |
 | `/ws` | WebSocket | Real-time readings |
 | `/log.csv` | GET | Export all data as CSV |
+
+## iSpindel/GravityMon Setup
+
+Configure your iSpindel or GravityMon to POST to:
+
+```
+http://<raspberry-pi-ip>:8080/api/ingest/ispindel
+```
+
+The server auto-detects GravityMon extended format. Readings appear on the dashboard alongside Tilt devices.
 
 ## Calibration
 
@@ -134,3 +150,5 @@ MIT
 
 - [Tilt Hydrometer](https://tilthydrometer.com/) for the awesome hardware
 - [TiltPi](https://github.com/baronbrew/TiltPi) for inspiration
+- [iSpindel](https://www.ispindel.de/) for the open-source WiFi hydrometer
+- [GravityMon](https://github.com/mp-se/gravitymon) for extended iSpindel firmware

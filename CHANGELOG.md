@@ -5,6 +5,32 @@ All notable changes to Tilt UI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-29
+
+### Added
+- **Multi-Hydrometer Support** - Universal ingest layer for multiple device types
+- **iSpindel Support** - HTTP POST endpoint for iSpindel WiFi hydrometers
+- **GravityMon Support** - Extended iSpindel format with pre-filtered readings
+- **Device Registry** - Unified device management for all hydrometer types
+- **Device API** - CRUD endpoints for device management (`/api/devices`)
+- **Polynomial Calibration** - Angle-to-gravity calibration for iSpindel-style devices
+- **Unit Conversion** - Automatic Plato↔SG and Celsius↔Fahrenheit conversion
+
+### Technical
+- New `backend/ingest/` module with adapter pattern for device formats
+- `HydrometerReading` dataclass for universal reading representation
+- `IngestManager` service for reading pipeline (parse → calibrate → store → broadcast)
+- Database migration adds `devices` table and new columns to `readings`
+- Non-destructive migration preserves existing Tilt data
+- 114 backend tests with full coverage of new ingest layer
+
+### API Endpoints
+- `POST /api/ingest/generic` - Auto-detect device format
+- `POST /api/ingest/ispindel` - iSpindel HTTP endpoint
+- `POST /api/ingest/gravitymon` - GravityMon HTTP endpoint
+- `GET/POST/PUT/DELETE /api/devices` - Device management
+- `GET/PUT /api/devices/{id}/calibration` - Device calibration data
+
 ## [1.2.1] - 2025-11-28
 
 ### Fixed

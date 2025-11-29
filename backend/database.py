@@ -30,6 +30,7 @@ async def init_db():
         await conn.run_sync(_migrate_add_original_gravity)
         await conn.run_sync(_migrate_create_devices_table)
         await conn.run_sync(_migrate_add_reading_columns)
+        await conn.run_sync(_migrate_readings_nullable_tilt_id)
 
         # Step 2: Create any missing tables (fresh install or new models)
         # NOTE: Device model should be imported AFTER migrations for existing DBs
@@ -240,6 +241,94 @@ def _migrate_add_reading_columns(conn):
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_device_id ON readings(device_id)"))
     except Exception:
         pass  # Index might already exist
+
+
+def _migrate_readings_nullable_tilt_id(conn):
+    """Make tilt_id nullable in readings table for non-Tilt devices.
+
+    SQLite doesn't support ALTER COLUMN, so we need to recreate the table.
+    This migration checks if tilt_id is NOT NULL and recreates the table
+    with tilt_id as nullable.
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "readings" not in inspector.get_table_names():
+        return  # Fresh install, create_all will handle it
+
+    # Check if tilt_id is currently NOT NULL by looking at table info
+    result = conn.execute(text("PRAGMA table_info(readings)"))
+    columns_info = result.fetchall()
+
+    # Find tilt_id column and check if it's NOT NULL (notnull=1)
+    tilt_id_info = None
+    for col in columns_info:
+        if col[1] == "tilt_id":  # col[1] is column name
+            tilt_id_info = col
+            break
+
+    if tilt_id_info is None:
+        return  # No tilt_id column, nothing to migrate
+
+    # col[3] is notnull flag (1 = NOT NULL, 0 = nullable)
+    if tilt_id_info[3] == 0:
+        print("Migration: tilt_id already nullable, skipping")
+        return  # Already nullable
+
+    print("Migration: Recreating readings table with nullable tilt_id...")
+
+    # Step 1: Create new table with correct schema
+    conn.execute(text("""
+        CREATE TABLE readings_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tilt_id VARCHAR(50) REFERENCES tilts(id),
+            device_id VARCHAR(100) REFERENCES devices(id),
+            device_type VARCHAR(20) DEFAULT 'tilt',
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sg_raw REAL,
+            sg_calibrated REAL,
+            temp_raw REAL,
+            temp_calibrated REAL,
+            rssi INTEGER,
+            battery_voltage REAL,
+            battery_percent INTEGER,
+            angle REAL,
+            source_protocol VARCHAR(20) DEFAULT 'ble',
+            status VARCHAR(20) DEFAULT 'valid',
+            is_pre_filtered INTEGER DEFAULT 0
+        )
+    """))
+
+    # Step 2: Copy data from old table
+    conn.execute(text("""
+        INSERT INTO readings_new (
+            id, tilt_id, device_id, device_type, timestamp,
+            sg_raw, sg_calibrated, temp_raw, temp_calibrated, rssi,
+            battery_voltage, battery_percent, angle,
+            source_protocol, status, is_pre_filtered
+        )
+        SELECT
+            id, tilt_id, device_id, device_type, timestamp,
+            sg_raw, sg_calibrated, temp_raw, temp_calibrated, rssi,
+            battery_voltage, battery_percent, angle,
+            source_protocol, status, is_pre_filtered
+        FROM readings
+    """))
+
+    # Step 3: Drop old table
+    conn.execute(text("DROP TABLE readings"))
+
+    # Step 4: Rename new table
+    conn.execute(text("ALTER TABLE readings_new RENAME TO readings"))
+
+    # Step 5: Recreate indexes
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_tilt_timestamp ON readings(tilt_id, timestamp)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_device_timestamp ON readings(device_id, timestamp)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_timestamp ON readings(timestamp)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_tilt_id ON readings(tilt_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_device_id ON readings(device_id)"))
+
+    print("Migration: Readings table recreated with nullable tilt_id")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

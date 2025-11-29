@@ -1,5 +1,6 @@
+import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, field_validator
 from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
@@ -23,6 +24,57 @@ class Tilt(Base):
     calibration_points: Mapped[list["CalibrationPoint"]] = relationship(
         back_populates="tilt", cascade="all, delete-orphan"
     )
+
+
+class Device(Base):
+    """Universal hydrometer device registry."""
+    __tablename__ = "devices"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    device_type: Mapped[str] = mapped_column(String(20), nullable=False, default="tilt")
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Current assignment
+    beer_name: Mapped[Optional[str]] = mapped_column(String(100))
+    original_gravity: Mapped[Optional[float]] = mapped_column()
+
+    # Native units (for display and conversion)
+    native_gravity_unit: Mapped[str] = mapped_column(String(10), default="sg")
+    native_temp_unit: Mapped[str] = mapped_column(String(5), default="f")
+
+    # Calibration - stored as JSON string, use properties for access
+    calibration_type: Mapped[str] = mapped_column(String(20), default="none")
+    _calibration_data: Mapped[Optional[str]] = mapped_column("calibration_data", Text)
+
+    @property
+    def calibration_data(self) -> Optional[dict[str, Any]]:
+        """Get calibration data as dict."""
+        if self._calibration_data:
+            return json.loads(self._calibration_data)
+        return None
+
+    @calibration_data.setter
+    def calibration_data(self, value: Optional[dict[str, Any]]) -> None:
+        """Set calibration data from dict."""
+        if value is not None:
+            self._calibration_data = json.dumps(value)
+        else:
+            self._calibration_data = None
+
+    # Security
+    auth_token: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Status
+    last_seen: Mapped[Optional[datetime]] = mapped_column()
+    battery_voltage: Mapped[Optional[float]] = mapped_column()
+    firmware_version: Mapped[Optional[str]] = mapped_column(String(50))
+
+    # Legacy compatibility (Tilt-specific)
+    color: Mapped[Optional[str]] = mapped_column(String(20))
+    mac: Mapped[Optional[str]] = mapped_column(String(17))
+
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
 class Reading(Base):

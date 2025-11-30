@@ -296,6 +296,18 @@ async def serve_system():
     return FileResponse(static_dir / "system.html")
 
 
+@app.get("/batches", response_class=FileResponse)
+async def serve_batches():
+    """Serve the batches page."""
+    return FileResponse(static_dir / "batches.html")
+
+
+@app.get("/batches/{path:path}", response_class=FileResponse)
+async def serve_batches_subpages(path: str):
+    """Serve batches subpages (detail, new, etc.) - SPA handles routing."""
+    return FileResponse(static_dir / "batches.html")
+
+
 @app.get("/favicon.png", response_class=FileResponse)
 async def serve_favicon():
     """Serve the favicon."""

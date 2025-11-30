@@ -48,6 +48,7 @@
 	let selectedRange = $state(24); // hours
 	let readings = $state<HistoricalReading[]>([]);
 	let ambientReadings = $state<AmbientHistoricalReading[]>([]);
+	let currentTrend = $state<TrendResult | null>(null);
 
 	// Color mapping for tilt accent in chart
 	const tiltColorMap: Record<string, string> = {
@@ -68,6 +69,97 @@
 	const TEXT_SECONDARY = '#a1a1aa';
 	const GRID_COLOR = 'rgba(255, 255, 255, 0.04)';
 	const CYAN = '#22d3ee'; // Ambient temp color
+	const TREND_COLOR = 'rgba(250, 204, 21, 0.5)'; // Semi-transparent yellow for trend line
+
+	// Trend line visibility state
+	const TREND_STORAGE_KEY = 'brewsignal_chart_trend_enabled';
+	let showTrendLine = $state(true);
+
+	// Linear regression for trend line calculation
+	interface TrendResult {
+		slope: number;        // SG change per second
+		intercept: number;    // Y-intercept
+		r2: number;           // Coefficient of determination (0-1)
+		predictedFg: number | null;  // Extrapolated final gravity
+		daysToFg: number | null;     // Estimated days until FG reached
+	}
+
+	function calculateLinearRegression(
+		timestamps: number[],
+		sgValues: (number | null)[],
+		targetFg: number = 1.010  // Default target FG for prediction
+	): TrendResult | null {
+		// Filter out null values and pair with timestamps
+		const validPairs: [number, number][] = [];
+		for (let i = 0; i < timestamps.length; i++) {
+			if (sgValues[i] !== null) {
+				validPairs.push([timestamps[i], sgValues[i]!]);
+			}
+		}
+
+		// Need at least 10 points for meaningful trend
+		if (validPairs.length < 10) return null;
+
+		const n = validPairs.length;
+		let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+		for (const [x, y] of validPairs) {
+			sumX += x;
+			sumY += y;
+			sumXY += x * y;
+			sumX2 += x * x;
+		}
+
+		const denom = n * sumX2 - sumX * sumX;
+		if (Math.abs(denom) < 1e-10) return null; // Avoid division by zero
+
+		const slope = (n * sumXY - sumX * sumY) / denom;
+		const intercept = (sumY - slope * sumX) / n;
+
+		// Calculate R² (coefficient of determination)
+		const yMean = sumY / n;
+		let ssRes = 0, ssTot = 0;
+		for (const [x, y] of validPairs) {
+			const predicted = slope * x + intercept;
+			ssRes += (y - predicted) ** 2;
+			ssTot += (y - yMean) ** 2;
+		}
+		const r2 = ssTot > 0 ? 1 - (ssRes / ssTot) : 0;
+
+		// Only show trend if slope is negative (gravity dropping) and decent fit
+		// Allow positive slope too but with lower confidence display
+		let predictedFg: number | null = null;
+		let daysToFg: number | null = null;
+
+		if (slope < 0 && r2 > 0.3) {
+			// Calculate when we'll hit target FG
+			// targetFg = slope * t + intercept
+			// t = (targetFg - intercept) / slope
+			const lastTimestamp = timestamps[timestamps.length - 1];
+			const timeToFg = (targetFg - intercept) / slope;
+
+			if (timeToFg > lastTimestamp) {
+				const secondsToFg = timeToFg - lastTimestamp;
+				daysToFg = secondsToFg / (24 * 60 * 60);
+
+				// Only predict if within reasonable range (< 60 days)
+				if (daysToFg > 0 && daysToFg < 60) {
+					predictedFg = targetFg;
+				} else {
+					daysToFg = null;
+				}
+			}
+		}
+
+		return { slope, intercept, r2, predictedFg, daysToFg };
+	}
+
+	function generateTrendLine(
+		timestamps: number[],
+		trend: TrendResult
+	): (number | null)[] {
+		return timestamps.map(t => trend.slope * t + trend.intercept);
+	}
 
 	// Create a date formatter for the target timezone
 	function formatTimeInTz(timestamp: number, tz: string, short: boolean): string {
@@ -214,6 +306,17 @@
 					dash: [2, 4],
 					points: { show: false },
 					paths: uPlot.paths.spline?.() // Smooth spline interpolation
+				},
+				{
+					// SG Trend line series
+					label: 'Trend',
+					scale: 'sg',
+					stroke: TREND_COLOR,
+					width: 2,
+					dash: [8, 4],
+					points: { show: false },
+					show: showTrendLine
+					// Linear path (no spline for trend line)
 				}
 			]
 		};
@@ -382,12 +485,21 @@
 			ambientValues = smoothData(ambientValues, smoothingSamples);
 		}
 
-		// Downsample for performance (max 500 points)
-	const maxPoints = 500;
-	[timestamps, sgValues, tempValues, ambientValues] = downsampleData(timestamps, sgValues, tempValues, ambientValues, maxPoints);
+			// Downsample for performance (max 500 points)
+		const maxPoints = 500;
+		[timestamps, sgValues, tempValues, ambientValues] = downsampleData(timestamps, sgValues, tempValues, ambientValues, maxPoints);
 
-	return [timestamps, sgValues, tempValues, ambientValues];
-}
+		// Calculate trend line
+		const trend = calculateLinearRegression(timestamps, sgValues);
+		currentTrend = trend;
+
+		// Generate trend line values (or nulls if no valid trend)
+		const trendValues: (number | null)[] = trend
+			? generateTrendLine(timestamps, trend)
+			: timestamps.map(() => null);
+
+		return [timestamps, sgValues, tempValues, ambientValues, trendValues];
+	}
 
 // Minimum interval between data fetches (30 seconds) to prevent BLE event spam
 const MIN_FETCH_INTERVAL_MS = 30000;
@@ -470,6 +582,12 @@ onMount(async () => {
 		}
 	}
 
+	// Load trend line preference from localStorage
+	const storedTrend = localStorage.getItem(TREND_STORAGE_KEY);
+	if (storedTrend !== null) {
+		showTrendLine = storedTrend === 'true';
+	}
+
 	// Fetch system timezone for chart display
 	try {
 		const response = await fetch('/api/system/timezone');
@@ -519,6 +637,15 @@ onMount(async () => {
 		// User changed refresh setting - trigger immediate reload
 		loadData(true);
 	}
+
+	function toggleTrendLine() {
+		showTrendLine = !showTrendLine;
+		localStorage.setItem(TREND_STORAGE_KEY, String(showTrendLine));
+		// Update the series visibility in the existing chart
+		if (chart) {
+			chart.setSeries(4, { show: showTrendLine });
+		}
+	}
 </script>
 
 <div class="chart-wrapper">
@@ -566,6 +693,16 @@ onMount(async () => {
 					<span class="legend-line legend-line-dotted" style="background: #22d3ee;"></span>
 					<span>Ambient</span>
 				</span>
+				<button
+					type="button"
+					class="legend-item legend-toggle"
+					class:legend-disabled={!showTrendLine}
+					onclick={toggleTrendLine}
+					title={showTrendLine ? 'Hide trend line' : 'Show trend line'}
+				>
+					<span class="legend-line legend-line-dashed" style="background: {TREND_COLOR};"></span>
+					<span>Trend</span>
+				</button>
 			</div>
 		</div>
 	</div>
@@ -596,6 +733,7 @@ onMount(async () => {
 			{readings}
 			{originalGravity}
 			onOgChange={onOgChange ?? (() => {})}
+			trend={currentTrend ? { predictedFg: currentTrend.predictedFg, daysToFg: currentTrend.daysToFg, r2: currentTrend.r2 } : null}
 		/>
 	{/if}
 </div>
@@ -711,6 +849,33 @@ onMount(async () => {
 	.legend-line-dotted {
 		background: linear-gradient(90deg, #22d3ee 2px, transparent 2px) !important;
 		background-size: 4px 2px !important;
+	}
+
+	.legend-line-dashed {
+		background: linear-gradient(90deg, rgba(250, 204, 21, 0.5) 6px, transparent 6px) !important;
+		background-size: 10px 2px !important;
+	}
+
+	.legend-toggle {
+		background: none;
+		border: none;
+		padding: 0.25rem 0.375rem;
+		margin: -0.25rem -0.375rem;
+		border-radius: 0.25rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.legend-toggle:hover {
+		background: var(--bg-hover);
+	}
+
+	.legend-disabled {
+		opacity: 0.4;
+	}
+
+	.legend-disabled .legend-line-dashed {
+		background: linear-gradient(90deg, var(--text-muted) 6px, transparent 6px) !important;
 	}
 
 	.chart-container {

@@ -18,13 +18,21 @@
 		return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
 	}
 
+	// Trend prediction data from TiltChart
+	interface TrendPrediction {
+		predictedFg: number | null;
+		daysToFg: number | null;
+		r2: number;
+	}
+
 	interface Props {
 		readings: HistoricalReading[];
 		originalGravity: number | null;
 		onOgChange: (og: number | null) => void;
+		trend?: TrendPrediction | null;
 	}
 
-	let { readings, originalGravity, onOgChange }: Props = $props();
+	let { readings, originalGravity, onOgChange, trend = null }: Props = $props();
 
 	// OG editing state
 	let isEditingOg = $state(false);
@@ -296,6 +304,13 @@
 				<span class="stat-label">ABV</span>
 				<span class="stat-value">{formatPercent(stats.abv)}</span>
 			</div>
+			{#if trend?.daysToFg !== null && trend?.daysToFg !== undefined}
+				<div class="stat-pill prediction-pill" title="Estimated time until target FG (R²={trend.r2.toFixed(2)})">
+					<span class="stat-label">ETA</span>
+					<span class="stat-value prediction">{formatDuration(trend.daysToFg)}</span>
+					<span class="prediction-badge">pred</span>
+				</div>
+			{/if}
 		</div>
 	</div>
 {:else}
@@ -443,6 +458,24 @@
 		text-transform: uppercase;
 		color: var(--text-muted);
 		background: var(--bg-surface);
+		padding: 0.0625rem 0.1875rem;
+		border-radius: 0.1875rem;
+		margin-left: 0.125rem;
+	}
+
+	.prediction-pill {
+		border-color: rgba(250, 204, 21, 0.3);
+	}
+
+	.stat-value.prediction {
+		color: var(--tilt-yellow, #facc15);
+	}
+
+	.prediction-badge {
+		font-size: 0.5rem;
+		text-transform: uppercase;
+		color: var(--tilt-yellow, #facc15);
+		background: rgba(250, 204, 21, 0.15);
 		padding: 0.0625rem 0.1875rem;
 		border-radius: 0.1875rem;
 		margin-left: 0.125rem;

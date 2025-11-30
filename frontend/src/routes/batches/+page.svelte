@@ -44,10 +44,10 @@
 					temperature: {
 						...existing.temperature,
 						current: tiltReading.temp,
-						// Determine temperature status based on thresholds (if available)
-						status: existing.temperature?.target_min !== undefined && existing.temperature?.target_max !== undefined
-							? (tiltReading.temp < existing.temperature.target_min ? 'too_cold' :
-							   tiltReading.temp > existing.temperature.target_max ? 'too_hot' : 'in_range')
+						// Determine temperature status based on yeast thresholds (if available)
+						status: existing.temperature?.yeast_min !== undefined && existing.temperature?.yeast_max !== undefined
+							? (tiltReading.temp < existing.temperature.yeast_min ? 'too_cold' :
+							   tiltReading.temp > existing.temperature.yeast_max ? 'too_hot' : 'in_range')
 							: existing.temperature?.status
 					}
 				});

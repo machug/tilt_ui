@@ -17,6 +17,22 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
+def _migrate_add_batch_id_to_readings(conn):
+    """Add batch_id column to readings table if not present."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "readings" not in inspector.get_table_names():
+        return  # Fresh install, create_all will handle it
+
+    columns = [c["name"] for c in inspector.get_columns("readings")]
+    if "batch_id" not in columns:
+        conn.execute(text("ALTER TABLE readings ADD COLUMN batch_id INTEGER REFERENCES batches(id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_batch_id ON readings(batch_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_batch_timestamp ON readings(batch_id, timestamp)"))
+        print("Migration: Added batch_id column to readings table")
+
+
 async def init_db():
     """Initialize database with migrations.
 
@@ -32,11 +48,13 @@ async def init_db():
         await conn.run_sync(_migrate_add_reading_columns)
         await conn.run_sync(_migrate_readings_nullable_tilt_id)
 
-        # Step 2: Create any missing tables (fresh install or new models)
-        # NOTE: Device model should be imported AFTER migrations for existing DBs
+        # Step 2: Create any missing tables (includes new Style, Recipe, Batch tables)
         await conn.run_sync(Base.metadata.create_all)
 
-        # Step 3: Data migrations (requires both tables to exist)
+        # Step 3: Migrations that depend on new tables existing
+        await conn.run_sync(_migrate_add_batch_id_to_readings)  # Add this line (after batches table exists)
+
+        # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
 
 

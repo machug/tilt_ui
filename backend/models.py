@@ -84,6 +84,7 @@ class Reading(Base):
     __table_args__ = (
         Index("ix_readings_tilt_timestamp", "tilt_id", "timestamp"),
         Index("ix_readings_device_timestamp", "device_id", "timestamp"),
+        Index("ix_readings_batch_timestamp", "batch_id", "timestamp"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -91,6 +92,8 @@ class Reading(Base):
     tilt_id: Mapped[Optional[str]] = mapped_column(ForeignKey("tilts.id"), nullable=True, index=True)
     # Universal device FK - for all device types including Tilt
     device_id: Mapped[Optional[str]] = mapped_column(ForeignKey("devices.id"), nullable=True, index=True)
+    # Batch FK - for tracking readings per batch
+    batch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("batches.id"), nullable=True, index=True)
     device_type: Mapped[str] = mapped_column(String(20), default="tilt")
     timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
 
@@ -118,6 +121,7 @@ class Reading(Base):
     # Relationships
     tilt: Mapped[Optional["Tilt"]] = relationship(back_populates="readings")
     device: Mapped[Optional["Device"]] = relationship(back_populates="readings")
+    batch: Mapped[Optional["Batch"]] = relationship(back_populates="readings")
 
 
 class CalibrationPoint(Base):
@@ -170,6 +174,112 @@ class Config(Base):
 
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[Optional[str]] = mapped_column(Text)  # JSON encoded
+
+
+class Style(Base):
+    """BJCP Style Guidelines reference data."""
+    __tablename__ = "styles"
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)  # e.g., "bjcp-2021-18b"
+    guide: Mapped[str] = mapped_column(String(50), nullable=False)  # "BJCP 2021"
+    category_number: Mapped[str] = mapped_column(String(10), nullable=False)  # "18"
+    style_letter: Mapped[Optional[str]] = mapped_column(String(5))  # "B"
+    name: Mapped[str] = mapped_column(String(100), nullable=False)  # "American Pale Ale"
+    category: Mapped[str] = mapped_column(String(100), nullable=False)  # "Pale American Ale"
+    type: Mapped[Optional[str]] = mapped_column(String(20))  # "Ale", "Lager", etc.
+    og_min: Mapped[Optional[float]] = mapped_column()
+    og_max: Mapped[Optional[float]] = mapped_column()
+    fg_min: Mapped[Optional[float]] = mapped_column()
+    fg_max: Mapped[Optional[float]] = mapped_column()
+    ibu_min: Mapped[Optional[float]] = mapped_column()
+    ibu_max: Mapped[Optional[float]] = mapped_column()
+    srm_min: Mapped[Optional[float]] = mapped_column()
+    srm_max: Mapped[Optional[float]] = mapped_column()
+    abv_min: Mapped[Optional[float]] = mapped_column()
+    abv_max: Mapped[Optional[float]] = mapped_column()
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    recipes: Mapped[list["Recipe"]] = relationship(back_populates="style")
+
+
+class Recipe(Base):
+    """Recipes imported from BeerXML or created manually."""
+    __tablename__ = "recipes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    author: Mapped[Optional[str]] = mapped_column(String(100))
+    style_id: Mapped[Optional[str]] = mapped_column(ForeignKey("styles.id"))
+    type: Mapped[Optional[str]] = mapped_column(String(50))  # "All Grain", "Extract", etc.
+
+    # Gravity targets
+    og_target: Mapped[Optional[float]] = mapped_column()
+    fg_target: Mapped[Optional[float]] = mapped_column()
+
+    # Yeast info (extracted from BeerXML)
+    yeast_name: Mapped[Optional[str]] = mapped_column(String(100))
+    yeast_lab: Mapped[Optional[str]] = mapped_column(String(100))
+    yeast_product_id: Mapped[Optional[str]] = mapped_column(String(50))
+    yeast_temp_min: Mapped[Optional[float]] = mapped_column()  # Celsius
+    yeast_temp_max: Mapped[Optional[float]] = mapped_column()  # Celsius
+    yeast_attenuation: Mapped[Optional[float]] = mapped_column()  # Percent
+
+    # Other targets
+    ibu_target: Mapped[Optional[float]] = mapped_column()
+    srm_target: Mapped[Optional[float]] = mapped_column()
+    abv_target: Mapped[Optional[float]] = mapped_column()
+    batch_size: Mapped[Optional[float]] = mapped_column()  # Liters
+
+    # Raw BeerXML for future re-parsing
+    beerxml_content: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Metadata
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    style: Mapped[Optional["Style"]] = relationship(back_populates="recipes")
+    batches: Mapped[list["Batch"]] = relationship(back_populates="recipe")
+
+
+class Batch(Base):
+    """Instances of brewing a recipe on a device."""
+    __tablename__ = "batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    recipe_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recipes.id"))
+    device_id: Mapped[Optional[str]] = mapped_column(ForeignKey("devices.id"))
+
+    # Batch identification
+    batch_number: Mapped[Optional[int]] = mapped_column()
+    name: Mapped[Optional[str]] = mapped_column(String(200))  # Optional override
+
+    # Status tracking
+    status: Mapped[str] = mapped_column(String(20), default="planning")  # planning, fermenting, conditioning, completed, archived
+
+    # Timeline
+    brew_date: Mapped[Optional[datetime]] = mapped_column()
+    start_time: Mapped[Optional[datetime]] = mapped_column()  # Fermentation start
+    end_time: Mapped[Optional[datetime]] = mapped_column()  # Fermentation end
+
+    # Measured values
+    measured_og: Mapped[Optional[float]] = mapped_column()
+    measured_fg: Mapped[Optional[float]] = mapped_column()
+    measured_abv: Mapped[Optional[float]] = mapped_column()
+    measured_attenuation: Mapped[Optional[float]] = mapped_column()
+
+    # Notes
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    recipe: Mapped[Optional["Recipe"]] = relationship(back_populates="batches")
+    device: Mapped[Optional["Device"]] = relationship()
+    readings: Mapped[list["Reading"]] = relationship(back_populates="batch")
 
 
 # Pydantic Schemas

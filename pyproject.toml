@@ -1,6 +1,6 @@
 [project]
 name = "brewsignal"
-version = "2.0.0"
+version = "2.1.0"
 description = "Modern web UI for BrewSignal Hydrometer monitoring"
 requires-python = ">=3.11"
 dependencies = [

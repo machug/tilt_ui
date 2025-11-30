@@ -8,8 +8,8 @@ Type=simple
 User=pi
 Group=pi
 WorkingDirectory=/opt/brewsignal
-Environment="PATH=/opt/brewsignal/venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/opt/brewsignal/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080
+Environment="PATH=/opt/brewsignal/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/brewsignal/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=5
 

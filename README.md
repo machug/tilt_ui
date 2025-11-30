@@ -4,6 +4,16 @@ A modern web interface for monitoring fermentation hydrometers on Raspberry Pi. 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
+## Quick Install (Raspberry Pi)
+
+```bash
+git clone https://github.com/machug/brewsignal.git
+cd brewsignal
+python3 -m venv venv && source venv/bin/activate
+pip install -e .
+uvicorn backend.main:app --host 0.0.0.0 --port 8080
+```
+
 ## Features
 
 - **Multi-Device Support** - Tilt (BLE), iSpindel (HTTP), GravityMon (HTTP) hydrometers
@@ -15,6 +25,7 @@ A modern web interface for monitoring fermentation hydrometers on Raspberry Pi. 
 - **Home Assistant Integration** - Display ambient temperature/humidity from HA sensors
 - **Temperature Control** - Automatic heater control via HA switch with hysteresis and manual override
 - **Weather Alerts** - Predictive alerts when forecast temps may affect fermentation
+- **BeerXML Import & Batch Tracking** - Import recipes, link readings to batches, and track against targets
 - **Data Export** - Download all readings as CSV
 - **Dark Theme** - Easy on the eyes during late-night brew checks
 
@@ -107,6 +118,15 @@ http://<raspberry-pi-ip>:8080/api/ingest/ispindel
 
 The server auto-detects GravityMon extended format. Readings appear on the dashboard alongside Tilt devices.
 
+## BeerXML Import
+
+Import a BeerXML file to auto-populate recipe targets and link batches:
+
+```bash
+curl -X POST "http://<raspberry-pi-ip>:8080/api/recipes/import" \
+  -F "file=@/path/to/recipe.xml"
+```
+
 ## Calibration
 
 Add calibration points to correct SG and temperature readings:
@@ -120,7 +140,7 @@ Add calibration points to correct SG and temperature readings:
 
 ```bash
 # Backend (FastAPI)
-cd tilt_ui
+cd brewsignal
 pip install -e ".[dev]"
 uvicorn backend.main:app --reload
 

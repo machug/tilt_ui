@@ -13,6 +13,8 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/brewsignal"
 SERVICE_FILE="/etc/systemd/system/brewsignal.service"
 REPO_URL="https://github.com/machug/brewsignal.git"
+VENV_DIR="$INSTALL_DIR/.venv"
+FRONTEND_DIR="$INSTALL_DIR/frontend"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  BrewSignal Installation Script${NC}"
@@ -34,12 +36,14 @@ if ! grep -q "Raspberry Pi\|BCM" /proc/cpuinfo 2>/dev/null; then
     fi
 fi
 
-echo -e "\n${GREEN}[1/7] Installing system dependencies...${NC}"
+echo -e "\n${GREEN}[1/8] Installing system dependencies...${NC}"
 apt-get update
 apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
+    nodejs \
+    npm \
     bluetooth \
     bluez \
     libbluetooth-dev \
@@ -47,7 +51,7 @@ apt-get install -y \
     git
 
 # Ensure Bluetooth is enabled
-echo -e "\n${GREEN}[2/7] Configuring Bluetooth...${NC}"
+echo -e "\n${GREEN}[2/8] Configuring Bluetooth...${NC}"
 systemctl enable bluetooth
 systemctl start bluetooth
 
@@ -58,7 +62,7 @@ if systemctl is-active --quiet brewsignal; then
 fi
 
 # Create install directory
-echo -e "\n${GREEN}[3/7] Setting up installation directory...${NC}"
+echo -e "\n${GREEN}[3/8] Setting up installation directory...${NC}"
 mkdir -p "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR/data"
 
@@ -69,6 +73,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 if [ -d "$PROJECT_DIR/backend" ]; then
     echo "Installing from local project..."
     cp -r "$PROJECT_DIR/backend" "$INSTALL_DIR/"
+    cp -r "$PROJECT_DIR/frontend" "$INSTALL_DIR/" 2>/dev/null || true
     cp "$PROJECT_DIR/pyproject.toml" "$INSTALL_DIR/" 2>/dev/null || true
 else
     echo "Cloning from repository..."
@@ -82,14 +87,14 @@ else
 fi
 
 # Set up Python virtual environment
-echo -e "\n${GREEN}[4/7] Setting up Python environment...${NC}"
+echo -e "\n${GREEN}[4/8] Setting up Python environment...${NC}"
 cd "$INSTALL_DIR"
 
-if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
 fi
 
-source .venv/bin/activate
+source "$VENV_DIR/bin/activate"
 
 # Install dependencies
 if [ -f "pyproject.toml" ]; then
@@ -108,18 +113,34 @@ fi
 
 deactivate
 
+# Build frontend assets
+echo -e "\n${GREEN}[5/8] Building frontend assets...${NC}"
+if [ -d "$FRONTEND_DIR" ]; then
+    if ! command -v npm >/dev/null 2>&1; then
+        echo -e "${YELLOW}npm is not installed; skipping frontend build. Make sure backend/static has prebuilt assets.${NC}"
+    else
+        cd "$FRONTEND_DIR"
+        rm -rf node_modules
+        npm ci
+        npm run build
+        cd "$INSTALL_DIR"
+    fi
+else
+    echo "Frontend source not found; assuming prebuilt assets exist in backend/static."
+fi
+
 # Set capabilities for BLE scanning
-echo -e "\n${GREEN}[5/7] Setting Bluetooth capabilities...${NC}"
-setcap 'cap_net_raw,cap_net_admin+eip' "$INSTALL_DIR/.venv/bin/python3" || true
+echo -e "\n${GREEN}[6/8] Setting Bluetooth capabilities...${NC}"
+setcap 'cap_net_raw,cap_net_admin+eip' "$VENV_DIR/bin/python3" || true
 
 # Set ownership
-echo -e "\n${GREEN}[6/7] Setting permissions...${NC}"
+echo -e "\n${GREEN}[7/8] Setting permissions...${NC}"
 chown -R pi:pi "$INSTALL_DIR"
 chmod 755 "$INSTALL_DIR"
 chmod 700 "$INSTALL_DIR/data"
 
 # Install systemd service
-echo -e "\n${GREEN}[7/7] Installing systemd service...${NC}"
+echo -e "\n${GREEN}[8/8] Installing systemd service...${NC}"
 cp "$SCRIPT_DIR/brewsignal.service" "$SERVICE_FILE"
 systemctl daemon-reload
 systemctl enable brewsignal

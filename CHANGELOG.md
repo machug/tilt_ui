@@ -5,7 +5,13 @@ All notable changes to BrewSignal will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - 2025-11-30
+## [Unreleased]
+
+### Fixed
+- Systemd service now points to `.venv` so installs run with the correct virtualenv
+- Installer copies frontend assets alongside backend for local installs and builds the frontend during installation
+
+## [2.1.0] - Unreleased
 
 ### Added
 - **RSSI Signal Filtering** (#6) - Filter weak Bluetooth signals below configurable threshold to reduce noise

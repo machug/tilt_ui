@@ -59,6 +59,7 @@
 
 	const navLinks = [
 		{ href: '/', label: 'Dashboard' },
+		{ href: '/batches', label: 'Batches' },
 		{ href: '/logging', label: 'Logging' },
 		{ href: '/calibration', label: 'Calibration' },
 		{ href: '/system', label: 'System' }

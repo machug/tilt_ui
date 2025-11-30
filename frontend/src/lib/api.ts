@@ -62,3 +62,198 @@ export async function fetchAmbientHistory(hours: number = 24): Promise<AmbientHi
 	}
 	return response.json();
 }
+
+// ============================================================================
+// Batch Types & API
+// ============================================================================
+
+export type BatchStatus = 'planning' | 'fermenting' | 'conditioning' | 'completed' | 'archived';
+
+export interface RecipeResponse {
+	id: number;
+	name: string;
+	author?: string;
+	style_id?: string;
+	type?: string;
+	og_target?: number;
+	fg_target?: number;
+	yeast_name?: string;
+	yeast_lab?: string;
+	yeast_product_id?: string;
+	yeast_temp_min?: number;
+	yeast_temp_max?: number;
+	yeast_attenuation?: number;
+	ibu_target?: number;
+	srm_target?: number;
+	abv_target?: number;
+	batch_size?: number;
+	notes?: string;
+	created_at: string;
+}
+
+export interface BatchResponse {
+	id: number;
+	recipe_id?: number;
+	device_id?: string;
+	batch_number?: number;
+	name?: string;
+	status: BatchStatus;
+	brew_date?: string;
+	start_time?: string;
+	end_time?: string;
+	measured_og?: number;
+	measured_fg?: number;
+	measured_abv?: number;
+	measured_attenuation?: number;
+	notes?: string;
+	created_at: string;
+	recipe?: RecipeResponse;
+}
+
+export interface BatchCreate {
+	recipe_id?: number;
+	device_id?: string;
+	name?: string;
+	status?: BatchStatus;
+	brew_date?: string;
+	measured_og?: number;
+	notes?: string;
+}
+
+export interface BatchUpdate {
+	name?: string;
+	status?: BatchStatus;
+	device_id?: string;
+	brew_date?: string;
+	start_time?: string;
+	end_time?: string;
+	measured_og?: number;
+	measured_fg?: number;
+	notes?: string;
+}
+
+export interface BatchProgressResponse {
+	batch_id: number;
+	recipe_name?: string;
+	status: BatchStatus;
+	targets: {
+		og?: number;
+		fg?: number;
+		attenuation?: number;
+		abv?: number;
+	};
+	measured: {
+		og?: number;
+		current_sg?: number;
+		attenuation?: number;
+		abv?: number;
+	};
+	progress: {
+		percent_complete?: number;
+		sg_remaining?: number;
+		estimated_days_remaining?: number;
+	};
+	temperature: {
+		current?: number;
+		yeast_min?: number;
+		yeast_max?: number;
+		status: 'unknown' | 'in_range' | 'too_cold' | 'too_hot';
+	};
+}
+
+/**
+ * Fetch batches with optional filtering
+ */
+export async function fetchBatches(
+	status?: BatchStatus,
+	deviceId?: string,
+	limit: number = 50,
+	offset: number = 0
+): Promise<BatchResponse[]> {
+	const params = new URLSearchParams();
+	if (status) params.append('status', status);
+	if (deviceId) params.append('device_id', deviceId);
+	params.append('limit', String(limit));
+	params.append('offset', String(offset));
+
+	const response = await fetch(`${BASE_URL}/batches?${params}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch batches: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch a single batch by ID
+ */
+export async function fetchBatch(batchId: number): Promise<BatchResponse> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch batch: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Create a new batch
+ */
+export async function createBatch(batch: BatchCreate): Promise<BatchResponse> {
+	const response = await fetch(`${BASE_URL}/batches`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(batch)
+	});
+	if (!response.ok) {
+		throw new Error(`Failed to create batch: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Update an existing batch
+ */
+export async function updateBatch(batchId: number, update: BatchUpdate): Promise<BatchResponse> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(update)
+	});
+	if (!response.ok) {
+		throw new Error(`Failed to update batch: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Delete a batch
+ */
+export async function deleteBatch(batchId: number): Promise<void> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}`, {
+		method: 'DELETE'
+	});
+	if (!response.ok) {
+		throw new Error(`Failed to delete batch: ${response.statusText}`);
+	}
+}
+
+/**
+ * Fetch fermentation progress for a batch
+ */
+export async function fetchBatchProgress(batchId: number): Promise<BatchProgressResponse> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}/progress`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch batch progress: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch all recipes (for batch creation form)
+ */
+export async function fetchRecipes(): Promise<RecipeResponse[]> {
+	const response = await fetch(`${BASE_URL}/recipes`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch recipes: ${response.statusText}`);
+	}
+	return response.json();
+}

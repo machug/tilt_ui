@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import type { TiltReading } from '$lib/stores/tilts.svelte';
 	import { updateTiltBeerName, updateTiltOriginalGravity } from '$lib/stores/tilts.svelte';
 	import { configState, formatTemp, getTempUnit, formatGravity, getGravityUnit } from '$lib/stores/config.svelte';
+	import { fetchBatches, type BatchResponse } from '$lib/api';
 	import TiltChart from './TiltChart.svelte';
 
 	interface Props {
@@ -12,6 +15,28 @@
 	}
 
 	let { tilt, expanded = false, wide = false, onToggleExpand }: Props = $props();
+
+	// Linked batch state
+	let linkedBatch = $state<BatchResponse | null>(null);
+
+	// Fetch linked batch on mount
+	onMount(async () => {
+		try {
+			// Try both device_id formats: "tilt-{color}" and "{COLOR}"
+			const color = tilt.color.toUpperCase();
+			let batches = await fetchBatches(undefined, color, 1);
+			if (batches.length === 0) {
+				// Try legacy format
+				batches = await fetchBatches(undefined, `tilt-${tilt.color.toLowerCase()}`, 1);
+			}
+			if (batches.length > 0) {
+				// Get the active (fermenting/conditioning) batch, or most recent
+				linkedBatch = batches.find(b => b.status === 'fermenting' || b.status === 'conditioning') || batches[0];
+			}
+		} catch (e) {
+			console.error('Failed to fetch linked batch:', e);
+		}
+	});
 
 	// Track if chart has ever been shown (to avoid mounting until first expand)
 	let chartMounted = $state(false);
@@ -237,7 +262,22 @@
 
 		<!-- Footer -->
 		<div class="flex justify-between items-center pt-3 border-t border-[var(--bg-hover)]">
-			<span class="text-[11px] text-[var(--text-muted)]">Updated {lastSeenText}</span>
+			<div class="flex items-center gap-3">
+				<span class="text-[11px] text-[var(--text-muted)]">Updated {lastSeenText}</span>
+				{#if linkedBatch}
+					<button
+						type="button"
+						class="batch-link"
+						onclick={() => goto(`/batches/${linkedBatch.id}`)}
+					>
+						<span class="batch-status-dot" style="background: {linkedBatch.status === 'fermenting' ? '#f59e0b' : linkedBatch.status === 'conditioning' ? '#8b5cf6' : 'var(--text-muted)'}"></span>
+						Batch #{linkedBatch.batch_number}
+						<svg class="batch-link-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+						</svg>
+					</button>
+				{/if}
+			</div>
 			<div class="flex items-center gap-2">
 				{#if onToggleExpand}
 					<button
@@ -376,5 +416,44 @@
 
 	.beer-name-input:disabled {
 		opacity: 0.6;
+	}
+
+	/* Batch link */
+	.batch-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+		background: var(--bg-elevated);
+		border: 1px solid var(--border-subtle);
+		padding: 0.25rem 0.5rem;
+		border-radius: 9999px;
+		cursor: pointer;
+		transition: all var(--transition);
+	}
+
+	.batch-link:hover {
+		color: var(--accent);
+		border-color: var(--accent-muted);
+		background: var(--accent-muted);
+	}
+
+	.batch-status-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		animation: pulse 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.4; }
+	}
+
+	.batch-link-icon {
+		width: 0.75rem;
+		height: 0.75rem;
 	}
 </style>

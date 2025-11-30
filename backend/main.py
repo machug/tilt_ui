@@ -296,6 +296,36 @@ async def serve_system():
     return FileResponse(static_dir / "system.html")
 
 
+@app.get("/batches", response_class=FileResponse)
+async def serve_batches():
+    """Serve the batches page."""
+    return FileResponse(static_dir / "batches.html")
+
+
+@app.get("/batches/{path:path}", response_class=FileResponse)
+async def serve_batches_subpages(path: str):
+    """Serve batches subpages (detail, new, etc.) - SPA handles routing.
+
+    Tries to find the matching prerendered HTML file first,
+    falls back to index.html for dynamic routes (uses absolute paths).
+    """
+    # Try to find a prerendered HTML file for this path
+    # e.g., /batches/new -> static/batches/new.html
+    html_path = static_dir / "batches" / f"{path}.html"
+    if html_path.exists():
+        return FileResponse(html_path)
+
+    # Check if path is a directory with index.html
+    # e.g., /batches/new/ -> static/batches/new/index.html
+    index_path = static_dir / "batches" / path / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+
+    # Fall back to index.html for dynamic routes (e.g., /batches/123)
+    # index.html uses absolute paths which work for nested routes
+    return FileResponse(static_dir / "index.html")
+
+
 @app.get("/favicon.png", response_class=FileResponse)
 async def serve_favicon():
     """Serve the favicon."""

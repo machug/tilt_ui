@@ -7,7 +7,7 @@
 	let alertsDismissed = $state(false);
 	let alertsCollapsed = $state(false);
 
-	onMount(() => {
+	onMount(async () => {
 		// Load alert dismissal state from localStorage
 		const dismissed = localStorage.getItem('brewsignal_alerts_dismissed');
 		const dismissedTime = localStorage.getItem('brewsignal_alerts_dismissed_time');

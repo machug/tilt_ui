@@ -1,0 +1,437 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus } from '$lib/api';
+	import { fetchRecipes } from '$lib/api';
+	import { tiltsState } from '$lib/stores/tilts.svelte';
+
+	interface Props {
+		batch?: BatchResponse;
+		onSubmit: (data: BatchCreate | BatchUpdate) => Promise<void>;
+		onCancel: () => void;
+	}
+
+	let { batch, onSubmit, onCancel }: Props = $props();
+
+	// Form state
+	let name = $state(batch?.name || '');
+	let recipeId = $state<number | null>(batch?.recipe_id || null);
+	let deviceId = $state<string | null>(batch?.device_id || null);
+	let status = $state<BatchStatus>(batch?.status || 'planning');
+	let brewDate = $state(batch?.brew_date ? batch.brew_date.split('T')[0] : '');
+	let measuredOg = $state(batch?.measured_og?.toString() || '');
+	let measuredFg = $state(batch?.measured_fg?.toString() || '');
+	let notes = $state(batch?.notes || '');
+
+	let recipes = $state<RecipeResponse[]>([]);
+	let loadingRecipes = $state(true);
+	let saving = $state(false);
+	let error = $state<string | null>(null);
+
+	// Get available devices from tilts store
+	let availableDevices = $derived(Array.from(tiltsState.tilts.values()));
+
+	const statusOptions: { value: BatchStatus; label: string }[] = [
+		{ value: 'planning', label: 'Planning' },
+		{ value: 'fermenting', label: 'Fermenting' },
+		{ value: 'conditioning', label: 'Conditioning' },
+		{ value: 'completed', label: 'Completed' },
+		{ value: 'archived', label: 'Archived' }
+	];
+
+	let isEditMode = $derived(!!batch);
+
+	async function loadRecipes() {
+		loadingRecipes = true;
+		try {
+			recipes = await fetchRecipes();
+		} catch (e) {
+			console.error('Failed to load recipes:', e);
+		} finally {
+			loadingRecipes = false;
+		}
+	}
+
+	async function handleSubmit(e: Event) {
+		e.preventDefault();
+		if (saving) return;
+
+		saving = true;
+		error = null;
+
+		try {
+			const data: BatchCreate | BatchUpdate = {
+				name: name || undefined,
+				status,
+				device_id: deviceId || undefined,
+				brew_date: brewDate ? new Date(brewDate).toISOString() : undefined,
+				measured_og: measuredOg ? parseFloat(measuredOg) : undefined,
+				notes: notes || undefined
+			};
+
+			if (!isEditMode) {
+				(data as BatchCreate).recipe_id = recipeId || undefined;
+			}
+
+			if (isEditMode && measuredFg) {
+				(data as BatchUpdate).measured_fg = parseFloat(measuredFg);
+			}
+
+			await onSubmit(data);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to save batch';
+		} finally {
+			saving = false;
+		}
+	}
+
+	// Auto-fill name from recipe when recipe changes
+	$effect(() => {
+		if (!isEditMode && recipeId && !name) {
+			const recipe = recipes.find((r) => r.id === recipeId);
+			if (recipe) {
+				name = recipe.name;
+			}
+		}
+	});
+
+	onMount(() => {
+		loadRecipes();
+	});
+</script>
+
+<form class="batch-form" onsubmit={handleSubmit}>
+	<div class="form-header">
+		<h2 class="form-title">{isEditMode ? 'Edit Batch' : 'New Batch'}</h2>
+		<p class="form-description">
+			{isEditMode ? 'Update batch details and measurements' : 'Create a new fermentation batch'}
+		</p>
+	</div>
+
+	{#if error}
+		<div class="error-banner">
+			<span class="error-icon">!</span>
+			{error}
+		</div>
+	{/if}
+
+	<div class="form-body">
+		<!-- Recipe Selection (only for new batches) -->
+		{#if !isEditMode}
+			<div class="form-group">
+				<label class="form-label" for="recipe">Recipe</label>
+				<select
+					id="recipe"
+					class="form-select"
+					bind:value={recipeId}
+					disabled={loadingRecipes}
+				>
+					<option value={null}>No recipe (manual batch)</option>
+					{#each recipes as recipe}
+						<option value={recipe.id}>
+							{recipe.name}
+							{#if recipe.og_target}
+								(OG: {recipe.og_target.toFixed(3)})
+							{/if}
+						</option>
+					{/each}
+				</select>
+				<span class="form-hint">Select a recipe to auto-fill targets</span>
+			</div>
+		{/if}
+
+		<!-- Batch Name -->
+		<div class="form-group">
+			<label class="form-label" for="name">Batch Name</label>
+			<input
+				type="text"
+				id="name"
+				class="form-input"
+				bind:value={name}
+				placeholder="e.g., Summer IPA #3"
+				maxlength="200"
+			/>
+			<span class="form-hint">Optional - defaults to recipe name</span>
+		</div>
+
+		<!-- Status -->
+		<div class="form-group">
+			<label class="form-label" for="status">Status</label>
+			<select id="status" class="form-select" bind:value={status}>
+				{#each statusOptions as option}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+		</div>
+
+		<!-- Device -->
+		<div class="form-group">
+			<label class="form-label" for="device">Tracking Device</label>
+			<select id="device" class="form-select" bind:value={deviceId}>
+				<option value={null}>No device assigned</option>
+				{#each availableDevices as device}
+					<option value={device.id}>
+						{device.color} Tilt
+						{#if device.beer_name && device.beer_name !== 'Untitled'}
+							- {device.beer_name}
+						{/if}
+					</option>
+				{/each}
+			</select>
+			<span class="form-hint">Link a Tilt to track live gravity and temperature</span>
+		</div>
+
+		<!-- Brew Date -->
+		<div class="form-group">
+			<label class="form-label" for="brewDate">Brew Date</label>
+			<input
+				type="date"
+				id="brewDate"
+				class="form-input date-input"
+				bind:value={brewDate}
+			/>
+			<span class="form-hint">DD/MM/YYYY</span>
+		</div>
+
+		<!-- Gravity Measurements -->
+		<div class="form-row">
+			<div class="form-group">
+				<label class="form-label" for="og">Measured OG</label>
+				<input
+					type="number"
+					id="og"
+					class="form-input"
+					bind:value={measuredOg}
+					placeholder="1.050"
+					step="0.001"
+					min="0.990"
+					max="1.200"
+				/>
+			</div>
+			{#if isEditMode}
+				<div class="form-group">
+					<label class="form-label" for="fg">Measured FG</label>
+					<input
+						type="number"
+						id="fg"
+						class="form-input"
+						bind:value={measuredFg}
+						placeholder="1.010"
+						step="0.001"
+						min="0.990"
+						max="1.100"
+					/>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Notes -->
+		<div class="form-group">
+			<label class="form-label" for="notes">Notes</label>
+			<textarea
+				id="notes"
+				class="form-textarea"
+				bind:value={notes}
+				placeholder="Brewing notes, observations, etc."
+				rows="3"
+			></textarea>
+		</div>
+	</div>
+
+	<div class="form-footer">
+		<button type="button" class="btn-cancel" onclick={onCancel} disabled={saving}>
+			Cancel
+		</button>
+		<button type="submit" class="btn-submit" disabled={saving}>
+			{#if saving}
+				<span class="spinner"></span>
+				Saving...
+			{:else}
+				{isEditMode ? 'Save Changes' : 'Create Batch'}
+			{/if}
+		</button>
+	</div>
+</form>
+
+<style>
+	.batch-form {
+		background: var(--bg-surface);
+		border: 1px solid var(--border-subtle);
+		border-radius: 0.75rem;
+		overflow: hidden;
+	}
+
+	.form-header {
+		padding: 1.5rem;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.form-title {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 0.25rem 0;
+	}
+
+	.form-description {
+		font-size: 0.875rem;
+		color: var(--text-muted);
+		margin: 0;
+	}
+
+	.form-body {
+		padding: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.form-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.form-label {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+	}
+
+	.form-input,
+	.form-select,
+	.form-textarea {
+		padding: 0.625rem 0.75rem;
+		font-size: 0.875rem;
+		color: var(--text-primary);
+		background: var(--bg-elevated);
+		border: 1px solid var(--border-subtle);
+		border-radius: 0.5rem;
+		outline: none;
+		transition: border-color var(--transition);
+	}
+
+	.form-input:focus,
+	.form-select:focus,
+	.form-textarea:focus {
+		border-color: var(--accent);
+	}
+
+	.form-input::placeholder,
+	.form-textarea::placeholder {
+		color: var(--text-muted);
+	}
+
+	.form-select {
+		cursor: pointer;
+	}
+
+	.form-textarea {
+		resize: vertical;
+		min-height: 80px;
+	}
+
+	.form-hint {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.form-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		padding: 1rem 1.5rem;
+		background: var(--bg-elevated);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.btn-cancel,
+	.btn-submit {
+		padding: 0.625rem 1.25rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		transition: all var(--transition);
+	}
+
+	.btn-cancel {
+		color: var(--text-secondary);
+		background: transparent;
+		border: 1px solid var(--border-default);
+	}
+
+	.btn-cancel:hover:not(:disabled) {
+		color: var(--text-primary);
+		border-color: var(--text-muted);
+	}
+
+	.btn-submit {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: white;
+		background: var(--accent);
+		border: none;
+	}
+
+	.btn-submit:hover:not(:disabled) {
+		background: var(--accent-hover);
+	}
+
+	.btn-cancel:disabled,
+	.btn-submit:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.error-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin: 1rem 1.5rem 0;
+		padding: 0.75rem 1rem;
+		font-size: 0.875rem;
+		color: var(--negative);
+		background: rgba(239, 68, 68, 0.1);
+		border-radius: 0.5rem;
+	}
+
+	.error-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		font-size: 0.875rem;
+		font-weight: 700;
+		background: rgba(239, 68, 68, 0.2);
+		border-radius: 50%;
+	}
+
+	.spinner {
+		width: 1rem;
+		height: 1rem;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (max-width: 480px) {
+		.form-row {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

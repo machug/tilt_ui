@@ -200,13 +200,12 @@ class TiltUpdate(BaseModel):
 
 
 class TiltResponse(TiltBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     mac: Optional[str]
     original_gravity: Optional[float]
     last_seen: Optional[datetime]
-
-    class Config:
-        from_attributes = True
 
 
 class TiltReading(BaseModel):
@@ -222,6 +221,8 @@ class TiltReading(BaseModel):
 
 
 class ReadingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     timestamp: datetime
     sg_raw: Optional[float]
@@ -231,21 +232,19 @@ class ReadingResponse(BaseModel):
     rssi: Optional[int]
     status: Optional[str] = None  # 'valid', 'invalid', 'uncalibrated', 'incomplete'
 
-    class Config:
-        from_attributes = True
-
 
 class AmbientReadingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     timestamp: datetime
     temperature: Optional[float]
     humidity: Optional[float]
 
-    class Config:
-        from_attributes = True
-
 
 class ControlEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     timestamp: datetime
     tilt_id: Optional[str]
@@ -253,9 +252,6 @@ class ControlEventResponse(BaseModel):
     wort_temp: Optional[float]
     ambient_temp: Optional[float]
     target_temp: Optional[float]
-
-    class Config:
-        from_attributes = True
 
 
 class CalibrationPointCreate(BaseModel):
@@ -265,13 +261,12 @@ class CalibrationPointCreate(BaseModel):
 
 
 class CalibrationPointResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     type: str
     raw_value: float
     actual_value: float
-
-    class Config:
-        from_attributes = True
 
 
 class ConfigUpdate(BaseModel):

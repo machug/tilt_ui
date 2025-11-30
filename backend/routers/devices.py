@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -100,6 +100,8 @@ class DeviceUpdate(BaseModel):
 
 class DeviceResponse(BaseModel):
     """Schema for device response."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     device_type: str
     name: str
@@ -117,9 +119,6 @@ class DeviceResponse(BaseModel):
     color: Optional[str]
     mac: Optional[str]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
     @classmethod
     def from_orm_with_calibration(cls, device: Device) -> "DeviceResponse":

@@ -4,12 +4,57 @@
 	import type { BatchResponse, BatchProgressResponse, BatchStatus } from '$lib/api';
 	import { fetchBatches, fetchBatchProgress, deleteBatch } from '$lib/api';
 	import BatchCard from '$lib/components/BatchCard.svelte';
+	import { tiltsState } from '$lib/stores/tilts.svelte';
 
 	// State
 	let batches = $state<BatchResponse[]>([]);
 	let progressMap = $state<Map<number, BatchProgressResponse>>(new Map());
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	// Map device_id to batch_id for live updates
+	let deviceToBatch = $derived(
+		new Map(
+			batches
+				.filter((b) => b.device_id && (b.status === 'fermenting' || b.status === 'conditioning'))
+				.map((b) => [b.device_id!, b.id])
+		)
+	);
+
+	// Enhance progress with live WebSocket data
+	let liveProgressMap = $derived.by(() => {
+		const enhanced = new Map(progressMap);
+		for (const [deviceId, batchId] of deviceToBatch) {
+			const tiltReading = tiltsState.tilts.get(deviceId);
+			if (tiltReading) {
+				const existing = enhanced.get(batchId) || {
+					batch_id: batchId,
+					measured: {},
+					temperature: {},
+					progress: {},
+					targets: {}
+				};
+				// Update with live data
+				enhanced.set(batchId, {
+					...existing,
+					measured: {
+						...existing.measured,
+						current_sg: tiltReading.sg
+					},
+					temperature: {
+						...existing.temperature,
+						current: tiltReading.temp,
+						// Determine temperature status based on thresholds (if available)
+						status: existing.temperature?.target_min !== undefined && existing.temperature?.target_max !== undefined
+							? (tiltReading.temp < existing.temperature.target_min ? 'too_cold' :
+							   tiltReading.temp > existing.temperature.target_max ? 'too_hot' : 'in_range')
+							: existing.temperature?.status
+					}
+				});
+			}
+		}
+		return enhanced;
+	});
 
 	// Filters
 	let statusFilter = $state<BatchStatus | ''>('');
@@ -171,7 +216,7 @@
 			{#each filteredBatches as batch (batch.id)}
 				<BatchCard
 					{batch}
-					progress={progressMap.get(batch.id)}
+					progress={liveProgressMap.get(batch.id)}
 					onViewDetails={() => handleViewDetails(batch.id)}
 				/>
 			{/each}

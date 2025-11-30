@@ -2,12 +2,16 @@
 	import { onMount } from 'svelte';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { weatherState } from '$lib/stores/weather.svelte';
+	import { fetchBatches, type BatchResponse } from '$lib/api';
 	import TiltCard from '$lib/components/TiltCard.svelte';
+	import BatchSummary from '$lib/components/BatchSummary.svelte';
 
 	let alertsDismissed = $state(false);
 	let alertsCollapsed = $state(false);
+	let batches = $state<BatchResponse[]>([]);
+	let batchesLoaded = $state(false);
 
-	onMount(() => {
+	onMount(async () => {
 		// Load alert dismissal state from localStorage
 		const dismissed = localStorage.getItem('brewsignal_alerts_dismissed');
 		const dismissedTime = localStorage.getItem('brewsignal_alerts_dismissed_time');
@@ -17,6 +21,15 @@
 			if (elapsed < 6 * 60 * 60 * 1000) {
 				alertsDismissed = true;
 			}
+		}
+
+		// Load batches for summary
+		try {
+			batches = await fetchBatches();
+			batchesLoaded = true;
+		} catch (e) {
+			console.error('Failed to load batches:', e);
+			batchesLoaded = true;
 		}
 	});
 
@@ -79,6 +92,13 @@
 	</div>
 {/if}
 
+<!-- Batch Summary -->
+{#if batchesLoaded && batches.length > 0}
+	<div class="batch-summary-container">
+		<BatchSummary {batches} />
+	</div>
+{/if}
+
 {#if tiltsList.length === 0}
 	<div class="empty-state">
 		<div class="empty-icon">
@@ -119,6 +139,10 @@
 {/if}
 
 <style>
+	.batch-summary-container {
+		margin-bottom: 1.5rem;
+	}
+
 	.tilt-grid {
 		display: grid;
 		grid-template-columns: repeat(1, 1fr);

@@ -10,6 +10,7 @@ This is the central pipeline for ingesting readings from any device type:
 """
 
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -20,6 +21,7 @@ from ..models import Device, Reading
 from ..state import latest_readings
 from ..websocket import manager as ws_manager
 from .calibration import calibration_service
+from ..routers.config import get_config_value
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +29,26 @@ logger = logging.getLogger(__name__)
 SG_MIN, SG_MAX = 0.500, 1.200
 TEMP_MIN_F, TEMP_MAX_F = 32.0, 212.0  # Fahrenheit (freezing to boiling)
 
+# Config cache TTL in seconds (refresh every 30s to pick up changes reasonably quickly)
+CONFIG_CACHE_TTL = 30
+
 
 class IngestManager:
     """Manages the full ingest pipeline for all hydrometer types."""
 
     def __init__(self):
         self.adapter_router = AdapterRouter()
+        # Cache for min_rssi config to avoid DB query on every reading
+        self._min_rssi_cache: Optional[int] = None
+        self._min_rssi_cache_time: float = 0
+
+    async def _get_min_rssi(self, db: AsyncSession) -> Optional[int]:
+        """Get min_rssi config with caching to reduce DB queries."""
+        now = time.monotonic()
+        if now - self._min_rssi_cache_time > CONFIG_CACHE_TTL:
+            self._min_rssi_cache = await get_config_value(db, "min_rssi")
+            self._min_rssi_cache_time = now
+        return self._min_rssi_cache
 
     async def ingest(
         self,
@@ -72,20 +88,31 @@ class IngestManager:
         # Step 4: Convert units to standard (SG, Fahrenheit)
         reading = calibration_service.convert_units(reading)
 
-        # Step 5: Apply device calibration
+        # Step 5: Check RSSI threshold (filter weak signals)
+        min_rssi = await self._get_min_rssi(db)
+        if reading.rssi is not None and min_rssi is not None and reading.rssi < min_rssi:
+            logger.debug(
+                "Filtered reading: RSSI %d < threshold %d (device %s)",
+                reading.rssi,
+                min_rssi,
+                reading.device_id,
+            )
+            return None
+
+        # Step 6: Apply device calibration
         reading = await calibration_service.calibrate_device_reading(db, device, reading)
 
-        # Step 6: Store reading in database
+        # Step 7: Store reading in database
         db_reading = await self._store_reading(db, device, reading)
 
-        # Step 7: Update device last_seen
+        # Step 8: Update device last_seen
         device.last_seen = reading.timestamp
         if reading.battery_voltage is not None:
             device.battery_voltage = reading.battery_voltage
 
         await db.commit()
 
-        # Step 8: Broadcast via WebSocket
+        # Step 9: Broadcast via WebSocket
         await self._broadcast_reading(device, reading)
 
         logger.info(

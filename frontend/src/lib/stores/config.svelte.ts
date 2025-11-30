@@ -122,3 +122,39 @@ export function formatTemp(tempF: number, units: 'C' | 'F' = configState.config.
 export function getTempUnit(): string {
 	return configState.config.temp_units === 'C' ? '°C' : '°F';
 }
+
+// Gravity unit conversion utilities
+export function sgToPlato(sg: number): number {
+	// Approximation: P = -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3
+	return -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3;
+}
+
+export function sgToBrix(sg: number): number {
+	// For wort/beer, Brix ≈ Plato
+	return sgToPlato(sg);
+}
+
+export function formatGravity(
+	sg: number,
+	units: 'sg' | 'plato' | 'brix' = configState.config.sg_units
+): string {
+	switch (units) {
+		case 'plato':
+			return sgToPlato(sg).toFixed(1);
+		case 'brix':
+			return sgToBrix(sg).toFixed(1);
+		default:
+			return sg.toFixed(3);
+	}
+}
+
+export function getGravityUnit(): string {
+	switch (configState.config.sg_units) {
+		case 'plato':
+			return '°P';
+		case 'brix':
+			return '°Bx';
+		default:
+			return 'SG';
+	}
+}

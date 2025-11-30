@@ -26,6 +26,7 @@
 
 	// Config form state
 	let tempUnits = $state<'C' | 'F'>('C');
+	let sgUnits = $state<'sg' | 'plato' | 'brix'>('sg');
 	let minRssi = $state(-100);
 	let smoothingEnabled = $state(false);
 	let smoothingSamples = $state(5);
@@ -153,6 +154,7 @@
 
 	function syncConfigFromStore() {
 		tempUnits = configState.config.temp_units;
+		sgUnits = configState.config.sg_units;
 		minRssi = configState.config.min_rssi;
 		smoothingEnabled = configState.config.smoothing_enabled;
 		smoothingSamples = configState.config.smoothing_samples;
@@ -184,6 +186,7 @@
 		try {
 			const result = await updateConfig({
 				temp_units: tempUnits,
+				sg_units: sgUnits,
 				min_rssi: minRssi,
 				smoothing_enabled: smoothingEnabled,
 				smoothing_samples: smoothingSamples,
@@ -553,6 +556,34 @@
 									class:active={tempUnits === 'F'}
 									onclick={() => (tempUnits = 'F')}
 								>°F</button>
+							</div>
+						</div>
+
+						<!-- Gravity Units -->
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Gravity Units</span>
+								<span class="setting-description">Display gravity as SG, Plato, or Brix</span>
+							</div>
+							<div class="unit-toggle">
+								<button
+									type="button"
+									class="unit-btn"
+									class:active={sgUnits === 'sg'}
+									onclick={() => (sgUnits = 'sg')}
+								>SG</button>
+								<button
+									type="button"
+									class="unit-btn"
+									class:active={sgUnits === 'plato'}
+									onclick={() => (sgUnits = 'plato')}
+								>°P</button>
+								<button
+									type="button"
+									class="unit-btn"
+									class:active={sgUnits === 'brix'}
+									onclick={() => (sgUnits = 'brix')}
+								>°Bx</button>
 							</div>
 						</div>
 

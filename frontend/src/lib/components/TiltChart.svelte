@@ -8,7 +8,7 @@
 		type HistoricalReading,
 		type AmbientHistoricalReading
 	} from '$lib/api';
-	import { configState, fahrenheitToCelsius } from '$lib/stores/config.svelte';
+	import { configState, fahrenheitToCelsius, formatGravity, getGravityUnit } from '$lib/stores/config.svelte';
 	import FermentationStats from './FermentationStats.svelte';
 
 	const REFRESH_STORAGE_KEY = 'brewsignal_chart_refresh_minutes';
@@ -38,8 +38,9 @@
 
 	let { tiltId, tiltColor, originalGravity = null, onOgChange }: Props = $props();
 
-	// Reactive check for Celsius mode
+	// Reactive check for display units
 	let useCelsius = $derived(configState.config.temp_units === 'C');
+	let gravityUnit = $derived(getGravityUnit());
 
 	let chartContainer: HTMLDivElement;
 	let chart: uPlot | null = null;
@@ -248,14 +249,14 @@
 						vals.map((v) => formatTimeInTz(v, tz, selectedRange <= 24))
 				},
 				{
-					// Y axis left (SG)
+					// Y axis left (SG/Plato/Brix)
 					scale: 'sg',
 					stroke: sgColor,
 					grid: { stroke: GRID_COLOR, width: 1 },
 					ticks: { stroke: GRID_COLOR, width: 1, size: 4 },
 					font: '11px "JetBrains Mono", monospace',
 					labelFont: '11px "JetBrains Mono", monospace',
-					values: (u, vals) => vals.map((v) => v.toFixed(3)),
+					values: (u, vals) => vals.map((v) => formatGravity(v)),
 					side: 3 // left
 				},
 				{
@@ -273,8 +274,8 @@
 			series: [
 				{}, // x series (timestamps)
 				{
-					// SG series
-					label: 'Gravity',
+					// Gravity series (SG/Plato/Brix)
+					label: gravityUnit === 'SG' ? 'Gravity' : gravityUnit === '°P' ? 'Plato' : 'Brix',
 					scale: 'sg',
 					stroke: sgColor,
 					width: 2,

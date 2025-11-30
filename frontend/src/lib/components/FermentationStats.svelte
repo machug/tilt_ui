@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { HistoricalReading } from '$lib/api';
-	import { configState, formatTemp, getTempUnit, fahrenheitToCelsius } from '$lib/stores/config.svelte';
+	import { configState, formatTemp, getTempUnit, fahrenheitToCelsius, formatGravity, getGravityUnit } from '$lib/stores/config.svelte';
 
 	// Valid ranges for outlier filtering (matches backend)
 	const SG_MIN = 0.5;
@@ -39,9 +39,10 @@
 	let ogEditValue = $state('');
 	let ogInputRef = $state<HTMLInputElement | null>(null);
 
-	// Reactive temp unit from config
+	// Reactive units from config
 	let useCelsius = $derived(configState.config.temp_units === 'C');
 	let tempUnit = $derived(getTempUnit());
+	let gravityUnit = $derived(getGravityUnit());
 
 	// Compute stats from readings
 	let stats = $derived.by(() => {
@@ -184,7 +185,7 @@
 	}
 
 	function formatSg(sg: number): string {
-		return sg.toFixed(3);
+		return formatGravity(sg);
 	}
 
 	function formatRate(rate: number): string {
@@ -216,7 +217,7 @@
 		<div class="stats-grid">
 			<!-- Gravity column -->
 			<div class="stats-column">
-				<h4 class="stats-header">Gravity</h4>
+				<h4 class="stats-header">{gravityUnit === 'SG' ? 'Gravity' : gravityUnit === '°P' ? 'Plato' : 'Brix'}</h4>
 				<div class="stat-row">
 					<span class="stat-label">Current</span>
 					<span class="stat-value">{formatSg(stats.currentSg)}</span>

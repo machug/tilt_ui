@@ -21,6 +21,15 @@ def sg_to_plato(sg: float) -> float:
     return -616.868 + 1111.14 * sg - 630.272 * sg**2 + 135.997 * sg**3
 
 
+def sg_to_brix(sg: float) -> float:
+    """Convert specific gravity to degrees Brix.
+
+    For wort/beer fermentation, Brix is approximately equal to Plato.
+    The difference between Brix and Plato is negligible for brewing purposes.
+    """
+    return sg_to_plato(sg)
+
+
 def celsius_to_fahrenheit(c: float) -> float:
     """Convert Celsius to Fahrenheit."""
     return (c * 9 / 5) + 32

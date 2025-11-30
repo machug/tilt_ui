@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { TiltReading } from '$lib/stores/tilts.svelte';
 	import { updateTiltBeerName, updateTiltOriginalGravity } from '$lib/stores/tilts.svelte';
-	import { configState, formatTemp, getTempUnit } from '$lib/stores/config.svelte';
+	import { configState, formatTemp, getTempUnit, formatGravity, getGravityUnit } from '$lib/stores/config.svelte';
 	import TiltChart from './TiltChart.svelte';
 
 	interface Props {
@@ -62,8 +62,9 @@
 		await updateTiltOriginalGravity(tilt.id, og);
 	}
 
-	// Reactive temp unit from config
+	// Reactive units from config
 	let tempUnit = $derived(getTempUnit());
+	let gravityUnit = $derived(getGravityUnit());
 
 	// CSS variable colors for the tilt accent
 	const colorVars: Record<string, string> = {
@@ -78,7 +79,7 @@
 	};
 
 	function formatSG(sg: number): string {
-		return sg.toFixed(3);
+		return formatGravity(sg);
 	}
 
 	function formatTempValue(temp: number): string {
@@ -186,10 +187,10 @@
 				style="background: var(--bg-elevated);"
 			>
 				<p class="text-3xl font-medium font-mono tracking-tight" style="color: var(--text-primary);">
-					{formatSG(tilt.sg)}
+					{formatSG(tilt.sg)}<span class="text-lg text-[var(--text-secondary)]">{gravityUnit !== 'SG' ? gravityUnit : ''}</span>
 				</p>
 				<p class="text-[11px] text-[var(--text-muted)] uppercase tracking-wider mt-1 font-medium">
-					Gravity
+					{gravityUnit === 'SG' ? 'Gravity' : gravityUnit === '°P' ? 'Plato' : 'Brix'}
 				</p>
 			</div>
 

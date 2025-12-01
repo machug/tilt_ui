@@ -50,6 +50,7 @@ class BatchControlStatusResponse(BaseModel):
     target_temp: Optional[float]
     hysteresis: Optional[float]
     wort_temp: Optional[float]
+    state_available: bool  # True if runtime state exists, False if cleaned up (batch completed/archived)
 
 
 class OverrideRequest(BaseModel):
@@ -140,6 +141,7 @@ async def get_batch_status(batch_id: int, db: AsyncSession = Depends(get_db)):
         target_temp=batch.temp_target if batch.temp_target is not None else global_target,
         hysteresis=batch.temp_hysteresis if batch.temp_hysteresis is not None else global_hysteresis,
         wort_temp=wort_temp,
+        state_available=batch_status["state_available"],
     )
 
 

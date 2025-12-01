@@ -49,6 +49,11 @@
 
 	let isEditMode = $derived(!!batch);
 
+	// Validate heater entity ID format
+	function isValidHeaterEntity(entity: string): boolean {
+		return /^(switch|input_boolean)\..+$/.test(entity);
+	}
+
 	async function loadRecipes() {
 		loadingRecipes = true;
 		try {
@@ -63,6 +68,12 @@
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		if (saving) return;
+
+		// Validate heater entity if provided
+		if (heaterEntityId && !isValidHeaterEntity(heaterEntityId)) {
+			error = "Invalid heater entity format. Must start with 'switch.' or 'input_boolean.'";
+			return;
+		}
 
 		saving = true;
 		error = null;
@@ -250,15 +261,18 @@
 					type="text"
 					id="heaterEntity"
 					class="form-input"
+					class:input-error={heaterEntityId && !isValidHeaterEntity(heaterEntityId)}
 					bind:value={heaterEntityId}
 					placeholder="switch.fermenter_heater"
-					pattern="(switch|input_boolean)\..+"
-					title="Must be a valid Home Assistant entity (e.g., switch.heater_1 or input_boolean.heater_1)"
 				/>
-				<span class="form-hint">e.g., switch.fermenter_heater_1 or input_boolean.fermenter_heater_1</span>
+				{#if heaterEntityId && !isValidHeaterEntity(heaterEntityId)}
+					<span class="form-error">Must start with 'switch.' or 'input_boolean.'</span>
+				{:else}
+					<span class="form-hint">e.g., switch.fermenter_heater_1 or input_boolean.fermenter_heater_1</span>
+				{/if}
 			</div>
 
-			{#if heaterEntityId}
+			{#if heaterEntityId && isValidHeaterEntity(heaterEntityId)}
 				<div class="form-row">
 					<div class="form-group">
 						<label class="form-label" for="tempTarget">Target Temperature (°F)</label>
@@ -428,6 +442,19 @@
 	.form-hint {
 		font-size: 0.75rem;
 		color: var(--text-muted);
+	}
+
+	.form-error {
+		font-size: 0.75rem;
+		color: var(--negative);
+	}
+
+	.input-error {
+		border-color: var(--negative);
+	}
+
+	.input-error:focus {
+		border-color: var(--negative);
 	}
 
 	.form-footer {

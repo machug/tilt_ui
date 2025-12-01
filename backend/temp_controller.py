@@ -431,17 +431,26 @@ def get_control_status() -> dict:
 
 
 def get_batch_control_status(batch_id: int) -> dict:
-    """Get temperature control status for a specific batch."""
-    batch_state = _batch_heater_states.get(batch_id, {})
+    """Get temperature control status for a specific batch.
+
+    Returns state_available=True if runtime state exists for this batch,
+    False if state was cleaned up (e.g., batch completed/archived).
+    """
+    batch_state = _batch_heater_states.get(batch_id)
     override = _batch_overrides.get(batch_id)
+
+    # state_available indicates whether runtime state exists for this batch
+    # False means state was cleaned up (batch no longer fermenting) or never existed
+    state_available = batch_state is not None
 
     return {
         "batch_id": batch_id,
-        "heater_state": batch_state.get("state"),
-        "heater_entity": batch_state.get("entity_id"),
+        "heater_state": batch_state.get("state") if batch_state else None,
+        "heater_entity": batch_state.get("entity_id") if batch_state else None,
         "override_active": override is not None,
         "override_state": override.get("state") if override else None,
         "override_until": override.get("until").isoformat() if override and override.get("until") else None,
+        "state_available": state_available,
     }
 
 

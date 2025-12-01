@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import type { BatchResponse, BatchProgressResponse, BatchUpdate, BatchStatus, BatchControlStatus } from '$lib/api';
-	import { fetchBatch, fetchBatchProgress, updateBatch, deleteBatch, fetchBatchControlStatus, toggleBatchHeater, setBatchHeaterOverride } from '$lib/api';
+	import { fetchBatch, fetchBatchProgress, updateBatch, deleteBatch, fetchBatchControlStatus, setBatchHeaterOverride } from '$lib/api';
 	import { formatGravity, getGravityUnit, formatTemp, getTempUnit, configState } from '$lib/stores/config.svelte';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import BatchForm from '$lib/components/BatchForm.svelte';
+
+	// WebSocket for live heater state updates
+	let controlWs: WebSocket | null = null;
+	let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// State
 	let batch = $state<BatchResponse | null>(null);
@@ -128,20 +132,6 @@
 		}
 	}
 
-	async function handleHeaterToggle(state: 'on' | 'off') {
-		if (!batch || heaterLoading) return;
-		heaterLoading = true;
-		try {
-			await toggleBatchHeater(batch.id, state);
-			// Reload control status
-			controlStatus = await fetchBatchControlStatus(batch.id);
-		} catch (e) {
-			console.error('Failed to toggle heater:', e);
-		} finally {
-			heaterLoading = false;
-		}
-	}
-
 	async function handleOverride(state: 'on' | 'off' | null) {
 		if (!batch || heaterLoading) return;
 		heaterLoading = true;
@@ -154,6 +144,55 @@
 		} finally {
 			heaterLoading = false;
 		}
+	}
+
+	// WebSocket connection for live heater state updates
+	function connectControlWebSocket() {
+		if (controlWs?.readyState === WebSocket.OPEN) return;
+
+		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+		controlWs = new WebSocket(wsUrl);
+
+		controlWs.onmessage = async (event) => {
+			try {
+				const data = JSON.parse(event.data);
+
+				// Handle control events for this batch
+				if (data.type === 'control_event' && data.batch_id === batchId) {
+					// Update heater state based on action
+					if (controlStatus) {
+						if (data.action === 'heat_on') {
+							controlStatus = { ...controlStatus, heater_state: 'on' };
+						} else if (data.action === 'heat_off') {
+							controlStatus = { ...controlStatus, heater_state: 'off' };
+						}
+					}
+				}
+			} catch (e) {
+				// Not a JSON message or parse error - ignore
+			}
+		};
+
+		controlWs.onclose = () => {
+			controlWs = null;
+			// Reconnect after 3 seconds
+			wsReconnectTimer = setTimeout(connectControlWebSocket, 3000);
+		};
+
+		controlWs.onerror = () => {
+			controlWs?.close();
+		};
+	}
+
+	function disconnectControlWebSocket() {
+		if (wsReconnectTimer) {
+			clearTimeout(wsReconnectTimer);
+			wsReconnectTimer = null;
+		}
+		controlWs?.close();
+		controlWs = null;
 	}
 
 	function formatSG(value?: number | null): string {
@@ -188,6 +227,12 @@
 
 	onMount(() => {
 		loadBatch();
+		// Connect WebSocket for live heater state updates
+		connectControlWebSocket();
+	});
+
+	onDestroy(() => {
+		disconnectControlWebSocket();
 	});
 </script>
 
@@ -477,31 +522,19 @@
 							{#if controlStatus.override_active}
 								<div class="override-banner">
 									<span class="override-icon">⚡</span>
-									<span>Override: {controlStatus.override_state?.toUpperCase()}</span>
+									<span>Override active: {controlStatus.override_state?.toUpperCase()}</span>
+									<button
+										type="button"
+										class="override-cancel-inline"
+										onclick={() => handleOverride(null)}
+										disabled={heaterLoading}
+									>
+										Cancel
+									</button>
 								</div>
 							{/if}
-							<div class="heater-controls">
-								<button
-									type="button"
-									class="heater-btn"
-									class:active={controlStatus.heater_state === 'on'}
-									onclick={() => handleHeaterToggle('on')}
-									disabled={heaterLoading}
-								>
-									Turn On
-								</button>
-								<button
-									type="button"
-									class="heater-btn"
-									class:active={controlStatus.heater_state === 'off'}
-									onclick={() => handleHeaterToggle('off')}
-									disabled={heaterLoading}
-								>
-									Turn Off
-								</button>
-							</div>
 							<div class="override-controls">
-								<span class="override-label">Override (1hr)</span>
+								<span class="override-label">Manual Override (1hr)</span>
 								<div class="override-btns">
 									<button
 										type="button"
@@ -521,16 +554,6 @@
 									>
 										Force OFF
 									</button>
-									{#if controlStatus.override_active}
-										<button
-											type="button"
-											class="override-btn cancel"
-											onclick={() => handleOverride(null)}
-											disabled={heaterLoading}
-										>
-											Cancel
-										</button>
-									{/if}
 								</div>
 							</div>
 						{/if}
@@ -1144,7 +1167,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		margin-bottom: 0.75rem;
-		padding: 0.375rem 0.625rem;
+		padding: 0.5rem 0.75rem;
 		background: rgba(59, 130, 246, 0.1);
 		border-radius: 0.375rem;
 		font-size: 0.75rem;
@@ -1155,37 +1178,24 @@
 		font-size: 0.875rem;
 	}
 
-	.heater-controls {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.heater-btn {
-		flex: 1;
-		padding: 0.5rem;
-		font-size: 0.75rem;
+	.override-cancel-inline {
+		margin-left: auto;
+		padding: 0.25rem 0.5rem;
+		font-size: 0.6875rem;
 		font-weight: 500;
-		border-radius: 0.375rem;
-		border: 1px solid var(--border-subtle);
-		background: var(--bg-elevated);
-		color: var(--text-secondary);
+		border-radius: 0.25rem;
+		background: transparent;
+		border: 1px solid var(--tilt-blue);
+		color: var(--tilt-blue);
 		cursor: pointer;
 		transition: all 0.15s ease;
 	}
 
-	.heater-btn:hover:not(:disabled) {
-		background: var(--bg-hover);
-		color: var(--text-primary);
+	.override-cancel-inline:hover:not(:disabled) {
+		background: rgba(59, 130, 246, 0.15);
 	}
 
-	.heater-btn.active {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: white;
-	}
-
-	.heater-btn:disabled {
+	.override-cancel-inline:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
@@ -1230,15 +1240,6 @@
 		background: var(--accent);
 		border-color: var(--accent);
 		color: white;
-	}
-
-	.override-btn.cancel {
-		border-color: var(--tilt-red);
-		color: var(--tilt-red);
-	}
-
-	.override-btn.cancel:hover:not(:disabled) {
-		background: rgba(244, 63, 94, 0.1);
 	}
 
 	.override-btn:disabled {

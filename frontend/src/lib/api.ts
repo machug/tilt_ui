@@ -187,6 +187,26 @@ export interface BatchControlStatus {
 }
 
 /**
+ * Heater entity from Home Assistant
+ */
+export interface HeaterEntity {
+	entity_id: string;
+	friendly_name: string;
+	state: string | null;
+}
+
+/**
+ * Fetch available heater entities from Home Assistant
+ */
+export async function fetchHeaterEntities(): Promise<HeaterEntity[]> {
+	const response = await fetch(`${BASE_URL}/control/heater-entities`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch heater entities: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
  * Fetch batch control status
  */
 export async function fetchBatchControlStatus(batchId: number): Promise<BatchControlStatus> {

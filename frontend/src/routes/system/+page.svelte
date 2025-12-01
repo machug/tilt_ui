@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { configState, updateConfig, fahrenheitToCelsius, celsiusToFahrenheit } from '$lib/stores/config.svelte';
-	import { tiltsState, toggleHeater, fetchHeaterState } from '$lib/stores/tilts.svelte';
 
 	interface SystemInfo {
 		hostname: string;
@@ -46,7 +45,6 @@
 	let haAmbientTempEntityId = $state('');
 	let haAmbientHumidityEntityId = $state('');
 	let haWeatherEntityId = $state('');
-	let haHeaterEntityId = $state('');
 	let haTesting = $state(false);
 	let haTestResult = $state<{ success: boolean; message: string } | null>(null);
 	let haStatus = $state<{ enabled: boolean; connected: boolean; url: string } | null>(null);
@@ -55,25 +53,12 @@
 	let haSuccess = $state(false);
 
 	// Temperature Control state
-	interface ControlStatus {
-		enabled: boolean;
-		heater_state: string | null;
-		override_active: boolean;
-		override_state: string | null;
-		override_until: string | null;
-		target_temp: number | null;
-		hysteresis: number | null;
-		wort_temp: number | null;
-		heater_entity: string | null;
-	}
-	let controlStatus = $state<ControlStatus | null>(null);
 	let tempControlEnabled = $state(false);
 	let tempTarget = $state(68.0);
 	let tempHysteresis = $state(1.0);
 	let controlSaving = $state(false);
 	let controlError = $state<string | null>(null);
 	let controlSuccess = $state(false);
-	let overrideLoading = $state(false);
 
 	// Weather Alerts state
 	let weatherAlertsEnabled = $state(false);
@@ -85,15 +70,6 @@
 	// Derived unit helpers
 	let useCelsius = $derived(configState.config.temp_units === 'C');
 	let tempUnitSymbol = $derived(useCelsius ? '°C' : '°F');
-
-	// Convert temperature for display (backend stores in Fahrenheit)
-	function displayTemp(tempF: number | null | undefined): string {
-		if (tempF === null || tempF === undefined) return '—';
-		if (useCelsius) {
-			return fahrenheitToCelsius(tempF).toFixed(1);
-		}
-		return tempF.toFixed(1);
-	}
 
 	// Convert temperature from display units to Fahrenheit for storage
 	function toFahrenheit(temp: number): number {
@@ -166,7 +142,6 @@
 		haAmbientTempEntityId = configState.config.ha_ambient_temp_entity_id;
 		haAmbientHumidityEntityId = configState.config.ha_ambient_humidity_entity_id;
 		haWeatherEntityId = configState.config.ha_weather_entity_id;
-		haHeaterEntityId = configState.config.ha_heater_entity_id;
 		// Temperature Control - convert from Fahrenheit to display units
 		tempControlEnabled = configState.config.temp_control_enabled;
 		tempTarget = Math.round(fromFahrenheit(configState.config.temp_target) * 2) / 2; // Round to nearest 0.5
@@ -214,8 +189,7 @@
 				ha_token: haToken,
 				ha_ambient_temp_entity_id: haAmbientTempEntityId,
 				ha_ambient_humidity_entity_id: haAmbientHumidityEntityId,
-				ha_weather_entity_id: haWeatherEntityId,
-				ha_heater_entity_id: haHeaterEntityId
+				ha_weather_entity_id: haWeatherEntityId
 			});
 			if (result.success) {
 				haSuccess = true;
@@ -227,17 +201,6 @@
 			}
 		} finally {
 			haSaving = false;
-		}
-	}
-
-	async function loadControlStatus() {
-		try {
-			const response = await fetch('/api/control/status');
-			if (response.ok) {
-				controlStatus = await response.json();
-			}
-		} catch (e) {
-			console.error('Failed to load control status:', e);
 		}
 	}
 
@@ -259,8 +222,6 @@
 			if (result.success) {
 				controlSuccess = true;
 				setTimeout(() => (controlSuccess = false), 3000);
-				// Reload control status after saving
-				await loadControlStatus();
 			} else {
 				controlError = result.error || 'Failed to save settings';
 			}
@@ -286,24 +247,6 @@
 			}
 		} finally {
 			alertsSaving = false;
-		}
-	}
-
-	async function setOverride(state: string | null) {
-		overrideLoading = true;
-		try {
-			const response = await fetch('/api/control/override', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ state, duration_minutes: 60 })
-			});
-			if (response.ok) {
-				await loadControlStatus();
-			}
-		} catch (e) {
-			console.error('Failed to set override:', e);
-		} finally {
-			overrideLoading = false;
 		}
 	}
 
@@ -465,8 +408,7 @@
 			loadSystemInfo(),
 			loadStorageStats(),
 			loadTimezones(),
-			loadHAStatus(),
-			loadControlStatus()
+			loadHAStatus()
 		]);
 		syncConfigFromStore();
 		loading = false;
@@ -839,20 +781,6 @@
 							/>
 						</div>
 
-						<!-- Heater Entity -->
-						<div class="setting-row">
-							<div class="setting-info">
-								<span class="setting-label">Heater Switch Entity</span>
-								<span class="setting-description">Switch to control fermentation heating</span>
-							</div>
-							<input
-								type="text"
-								bind:value={haHeaterEntityId}
-								placeholder="switch.fermenter_heater"
-								class="input-field"
-							/>
-						</div>
-
 						<!-- Save Button & Feedback -->
 						<div class="mt-4 config-actions">
 							<button
@@ -880,7 +808,7 @@
 			</div>
 
 			<!-- Temperature Control -->
-			{#if haEnabled && haHeaterEntityId}
+			{#if haEnabled}
 				<div class="card">
 					<div class="card-header">
 						<h2 class="card-title">Temperature Control</h2>
@@ -890,7 +818,7 @@
 						<div class="setting-row">
 							<div class="setting-info">
 								<span class="setting-label">Enable Temperature Control</span>
-								<span class="setting-description">Automatically control heater based on wort temp</span>
+								<span class="setting-description">Automatically control heaters for batches</span>
 							</div>
 							<button
 								type="button"
@@ -905,75 +833,14 @@
 						</div>
 
 						{#if tempControlEnabled}
-							<!-- Live Heater Status Card -->
-							<div class="heater-status-card" class:heater-active={tiltsState.heater.state === 'on'}>
-								<div class="heater-status-main">
-									<div class="heater-icon-container" class:heating={tiltsState.heater.state === 'on'}>
-										<span class="heater-icon">🔥</span>
-									</div>
-									<div class="heater-info">
-										<span class="heater-state-label">Heater Status</span>
-										<span class="heater-state-value" class:on={tiltsState.heater.state === 'on'}>
-											{tiltsState.heater.state === 'on' ? 'HEATING' : tiltsState.heater.state === 'off' ? 'OFF' : 'Unknown'}
-										</span>
-									</div>
-									<div class="heater-toggle-buttons">
-										<button
-											type="button"
-											class="heater-btn heater-btn-on"
-											class:active={tiltsState.heater.state === 'on'}
-											onclick={() => toggleHeater('on').then(() => fetchHeaterState())}
-											disabled={tiltsState.heater.loading}
-										>
-											Turn On
-										</button>
-										<button
-											type="button"
-											class="heater-btn heater-btn-off"
-											class:active={tiltsState.heater.state === 'off'}
-											onclick={() => toggleHeater('off').then(() => fetchHeaterState())}
-											disabled={tiltsState.heater.loading}
-										>
-											Turn Off
-										</button>
-									</div>
-								</div>
-								{#if controlStatus?.override_active}
-									<div class="override-banner">
-										<span class="override-icon">⚡</span>
-										<span>Manual override active: {controlStatus.override_state?.toUpperCase()}</span>
-									</div>
-								{/if}
-							</div>
+							<p class="section-note">
+								Configure heater switches per batch. These are the default settings used when a batch doesn't specify its own.
+							</p>
 
-							<!-- Control Status -->
-							{#if controlStatus}
-								<div class="control-status">
-									<div class="status-item">
-										<span class="status-label">Wort Temp</span>
-										<span class="status-value">
-											{controlStatus.wort_temp !== null ? `${displayTemp(controlStatus.wort_temp)}${tempUnitSymbol}` : '—'}
-										</span>
-									</div>
-									<div class="status-item">
-										<span class="status-label">Target</span>
-										<span class="status-value">
-											{tempTarget}{tempUnitSymbol}
-										</span>
-									</div>
-									<div class="status-item">
-										<span class="status-label">Mode</span>
-										<span class="status-value" class:override={controlStatus.override_active}>
-											{controlStatus.override_active ? 'Manual' : 'Auto'}
-										</span>
-									</div>
-								</div>
-							{/if}
-
-							<!-- Target Temperature -->
+							<!-- Default Target Temperature -->
 							<div class="setting-row">
 								<div class="setting-info">
-									<span class="setting-label">Target Temperature</span>
+									<span class="setting-label">Default Target Temperature</span>
 									<span class="setting-description">Desired fermentation temperature ({tempUnitSymbol})</span>
 								</div>
 								<div class="input-with-unit">
@@ -989,10 +856,10 @@
 								</div>
 							</div>
 
-							<!-- Hysteresis -->
+							<!-- Default Hysteresis -->
 							<div class="setting-row">
 								<div class="setting-info">
-									<span class="setting-label">Hysteresis</span>
+									<span class="setting-label">Default Hysteresis</span>
 									<span class="setting-description">± tolerance before triggering ({tempUnitSymbol})</span>
 								</div>
 								<div class="input-with-unit">
@@ -1005,44 +872,6 @@
 										class="input-field input-number"
 									/>
 									<span class="unit">{tempUnitSymbol}</span>
-								</div>
-							</div>
-
-							<!-- Manual Override Buttons -->
-							<div class="setting-row">
-								<div class="setting-info">
-									<span class="setting-label">Manual Override</span>
-									<span class="setting-description">Temporarily override automatic control (1 hour)</span>
-								</div>
-								<div class="override-buttons">
-									<button
-										type="button"
-										class="btn-override"
-										class:active={controlStatus?.override_state === 'on'}
-										onclick={() => setOverride('on')}
-										disabled={overrideLoading}
-									>
-										Force ON
-									</button>
-									<button
-										type="button"
-										class="btn-override"
-										class:active={controlStatus?.override_state === 'off'}
-										onclick={() => setOverride('off')}
-										disabled={overrideLoading}
-									>
-										Force OFF
-									</button>
-									{#if controlStatus?.override_active}
-										<button
-											type="button"
-											class="btn-override btn-cancel"
-											onclick={() => setOverride(null)}
-											disabled={overrideLoading}
-										>
-											Cancel
-										</button>
-									{/if}
 								</div>
 							</div>
 
@@ -1853,216 +1682,16 @@
 	}
 
 	/* Temperature Control */
-	.heater-status-card {
-		background: var(--bg-elevated);
-		border: 1px solid var(--bg-hover);
-		border-radius: 0.75rem;
-		padding: 1rem;
-		margin-bottom: 1rem;
-		transition: all 0.3s ease;
-	}
-
-	.heater-status-card.heater-active {
-		background: rgba(239, 68, 68, 0.08);
-		border-color: rgba(239, 68, 68, 0.3);
-	}
-
-	.heater-status-main {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.heater-icon-container {
-		width: 3rem;
-		height: 3rem;
-		border-radius: 0.75rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--bg-card);
-		transition: all 0.3s ease;
-	}
-
-	.heater-icon-container.heating {
-		background: rgba(239, 68, 68, 0.2);
-		animation: pulse-glow 2s ease-in-out infinite;
-	}
-
-	@keyframes pulse-glow {
-		0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-		50% { box-shadow: 0 0 20px 4px rgba(239, 68, 68, 0.3); }
-	}
-
-	.heater-icon {
-		font-size: 1.5rem;
-		transition: filter 0.3s ease;
-	}
-
-	.heater-icon-container:not(.heating) .heater-icon {
-		filter: grayscale(100%) opacity(0.5);
-	}
-
-	.heater-info {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-	}
-
-	.heater-state-label {
-		font-size: 0.625rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+	.section-note {
+		font-size: 0.8125rem;
 		color: var(--text-muted);
-	}
-
-	.heater-state-value {
-		font-size: 1.25rem;
-		font-weight: 700;
-		font-family: 'JetBrains Mono', monospace;
-		color: var(--text-secondary);
-	}
-
-	.heater-state-value.on {
-		color: var(--tilt-red);
-	}
-
-	.heater-toggle-buttons {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.heater-btn {
-		padding: 0.5rem 1rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-		border-radius: 0.5rem;
-		border: 1px solid var(--bg-hover);
-		background: var(--bg-card);
-		color: var(--text-secondary);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.heater-btn:hover:not(:disabled) {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-
-	.heater-btn-on.active {
-		background: rgba(239, 68, 68, 0.15);
-		border-color: var(--tilt-red);
-		color: var(--tilt-red);
-	}
-
-	.heater-btn-off.active {
-		background: rgba(74, 222, 128, 0.15);
-		border-color: var(--tilt-green);
-		color: var(--tilt-green);
-	}
-
-	.heater-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.override-banner {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 0.75rem;
-		padding: 0.5rem 0.75rem;
-		background: rgba(59, 130, 246, 0.1);
-		border-radius: 0.375rem;
-		font-size: 0.75rem;
-		color: var(--tilt-blue);
-	}
-
-	.override-icon {
-		font-size: 0.875rem;
-	}
-
-	.control-status {
-		display: flex;
-		gap: 1.5rem;
-		padding: 0.75rem 1rem;
-		background: var(--bg-elevated);
-		border-radius: 0.5rem;
 		margin-bottom: 1rem;
-	}
-
-	.status-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.status-label {
-		font-size: 0.625rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--text-muted);
-	}
-
-	.status-value {
-		font-size: 1rem;
-		font-weight: 600;
-		font-family: 'JetBrains Mono', monospace;
-		color: var(--text-primary);
-	}
-
-	.status-value.override {
-		color: var(--tilt-blue);
+		line-height: 1.5;
 	}
 
 	.input-number {
 		width: 6rem;
 		text-align: right;
-	}
-
-	.override-buttons {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.btn-override {
-		padding: 0.375rem 0.75rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		border-radius: 0.375rem;
-		background: var(--bg-elevated);
-		border: 1px solid var(--bg-hover);
-		color: var(--text-secondary);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.btn-override:hover:not(:disabled) {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-
-	.btn-override.active {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: white;
-	}
-
-	.btn-override.btn-cancel {
-		border-color: var(--tilt-red);
-		color: var(--tilt-red);
-	}
-
-	.btn-override.btn-cancel:hover:not(:disabled) {
-		background: rgba(244, 63, 94, 0.1);
-	}
-
-	.btn-override:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	@media (max-width: 640px) {

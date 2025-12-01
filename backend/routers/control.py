@@ -88,6 +88,46 @@ class HeaterToggleResponse(BaseModel):
     batch_id: Optional[int] = None
 
 
+class HeaterEntityResponse(BaseModel):
+    entity_id: str
+    friendly_name: str
+    state: Optional[str]
+
+
+@router.get("/heater-entities", response_model=list[HeaterEntityResponse])
+async def get_heater_entities(db: AsyncSession = Depends(get_db)):
+    """Get available heater entities from Home Assistant.
+
+    Returns switch.* and input_boolean.* entities that can be used as heaters.
+    """
+    ha_enabled = await get_config_value(db, "ha_enabled")
+    if not ha_enabled:
+        return []
+
+    # Get or initialize HA client
+    ha_client = get_ha_client()
+    if not ha_client:
+        ha_url = await get_config_value(db, "ha_url")
+        ha_token = await get_config_value(db, "ha_token")
+        if ha_url and ha_token:
+            ha_client = init_ha_client(ha_url, ha_token)
+
+    if not ha_client:
+        return []
+
+    # Fetch switch and input_boolean entities
+    entities = await ha_client.get_entities_by_domain(["switch", "input_boolean"])
+
+    return [
+        HeaterEntityResponse(
+            entity_id=e["entity_id"],
+            friendly_name=e["friendly_name"],
+            state=e["state"]
+        )
+        for e in entities
+    ]
+
+
 @router.get("/status", response_model=ControlStatusResponse)
 async def get_status(db: AsyncSession = Depends(get_db)):
     """Get current temperature control status (global settings)."""

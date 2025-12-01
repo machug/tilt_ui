@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus } from '$lib/api';
-	import { fetchRecipes } from '$lib/api';
+	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus, HeaterEntity } from '$lib/api';
+	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { configState } from '$lib/stores/config.svelte';
 
@@ -29,7 +29,9 @@
 	let tempHysteresis = $state(batch?.temp_hysteresis?.toString() || '');
 
 	let recipes = $state<RecipeResponse[]>([]);
+	let heaterEntities = $state<HeaterEntity[]>([]);
 	let loadingRecipes = $state(true);
+	let loadingHeaters = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 
@@ -49,11 +51,6 @@
 
 	let isEditMode = $derived(!!batch);
 
-	// Validate heater entity ID format
-	function isValidHeaterEntity(entity: string): boolean {
-		return /^(switch|input_boolean)\..+$/.test(entity);
-	}
-
 	async function loadRecipes() {
 		loadingRecipes = true;
 		try {
@@ -65,15 +62,21 @@
 		}
 	}
 
+	async function loadHeaterEntities() {
+		if (!haEnabled) return;
+		loadingHeaters = true;
+		try {
+			heaterEntities = await fetchHeaterEntities();
+		} catch (e) {
+			console.error('Failed to load heater entities:', e);
+		} finally {
+			loadingHeaters = false;
+		}
+	}
+
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		if (saving) return;
-
-		// Validate heater entity if provided
-		if (heaterEntityId && !isValidHeaterEntity(heaterEntityId)) {
-			error = "Invalid heater entity format. Must start with 'switch.' or 'input_boolean.'";
-			return;
-		}
 
 		saving = true;
 		error = null;
@@ -120,6 +123,7 @@
 
 	onMount(() => {
 		loadRecipes();
+		loadHeaterEntities();
 	});
 </script>
 
@@ -256,23 +260,30 @@
 			</div>
 
 			<div class="form-group">
-				<label class="form-label" for="heaterEntity">Heater Switch Entity</label>
-				<input
-					type="text"
+				<label class="form-label" for="heaterEntity">Heater Switch</label>
+				<select
 					id="heaterEntity"
-					class="form-input"
-					class:input-error={heaterEntityId && !isValidHeaterEntity(heaterEntityId)}
+					class="form-select"
 					bind:value={heaterEntityId}
-					placeholder="switch.fermenter_heater"
-				/>
-				{#if heaterEntityId && !isValidHeaterEntity(heaterEntityId)}
-					<span class="form-error">Must start with 'switch.' or 'input_boolean.'</span>
+					disabled={loadingHeaters}
+				>
+					<option value="">No heater assigned</option>
+					{#each heaterEntities as entity}
+						<option value={entity.entity_id}>
+							{entity.friendly_name} ({entity.state})
+						</option>
+					{/each}
+				</select>
+				{#if loadingHeaters}
+					<span class="form-hint">Loading available switches from Home Assistant...</span>
+				{:else if heaterEntities.length === 0}
+					<span class="form-hint">No switches found in Home Assistant</span>
 				{:else}
-					<span class="form-hint">e.g., switch.fermenter_heater_1 or input_boolean.fermenter_heater_1</span>
+					<span class="form-hint">Select a switch or input_boolean entity to control the heater</span>
 				{/if}
 			</div>
 
-			{#if heaterEntityId && isValidHeaterEntity(heaterEntityId)}
+			{#if heaterEntityId}
 				<div class="form-row">
 					<div class="form-group">
 						<label class="form-label" for="tempTarget">Target Temperature (°F)</label>
@@ -442,19 +453,6 @@
 	.form-hint {
 		font-size: 0.75rem;
 		color: var(--text-muted);
-	}
-
-	.form-error {
-		font-size: 0.75rem;
-		color: var(--negative);
-	}
-
-	.input-error {
-		border-color: var(--negative);
-	}
-
-	.input-error:focus {
-		border-color: var(--negative);
 	}
 
 	.form-footer {

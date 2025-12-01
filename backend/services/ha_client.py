@@ -100,6 +100,40 @@ class HAClient:
             logger.error(f"HA call_service error: {e}")
             return False
 
+    async def get_entities_by_domain(self, domains: list[str]) -> list[dict[str, Any]]:
+        """Get all entities matching the specified domains.
+
+        Args:
+            domains: List of domains to filter (e.g., ["switch", "input_boolean"])
+
+        Returns:
+            List of entity dicts with entity_id, state, and friendly_name
+        """
+        try:
+            client = await self._get_client()
+            response = await client.get(f"{self.url}/api/states", headers=self.headers)
+            if response.status_code == 200:
+                all_states = response.json()
+                entities = []
+                for state in all_states:
+                    entity_id = state.get("entity_id", "")
+                    domain = entity_id.split(".")[0] if "." in entity_id else ""
+                    if domain in domains:
+                        entities.append({
+                            "entity_id": entity_id,
+                            "state": state.get("state"),
+                            "friendly_name": state.get("attributes", {}).get("friendly_name", entity_id),
+                        })
+                # Sort by friendly name
+                entities.sort(key=lambda x: x["friendly_name"].lower())
+                return entities
+            else:
+                logger.error(f"HA get_entities failed: {response.status_code}")
+                return []
+        except Exception as e:
+            logger.error(f"HA get_entities error: {e}")
+            return []
+
     async def get_weather_forecast(self, entity_id: str) -> Optional[list[dict]]:
         """Get weather forecast from HA weather entity."""
         try:

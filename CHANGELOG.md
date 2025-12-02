@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2025-12-03
+
 ### Fixed
 - **Timezone Display Bug** (#42) - Fixed "Last Seen" times showing incorrect values (e.g., "11h ago" when device is actively transmitting)
   - All datetime fields now serialize with explicit UTC timezone indicator ('Z' suffix) per RFC 3339

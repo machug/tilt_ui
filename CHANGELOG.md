@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integration with batch creation (auto-fill from recipe)
   - Crimson Pro serif font for recipe names
   - JetBrains Mono for measurements
+- Device pairing workflow - devices must be paired before logging readings (#35)
+  - New `/devices` page for managing paired and unpaired devices
+  - Pairing status indicators on dashboard
+  - API endpoints for pairing/unpairing devices (`POST /api/tilts/{id}/pair`, `POST /api/tilts/{id}/unpair`)
+
+### Changed
+- Readings are only stored for paired devices
+- Batch creation only shows paired devices in device selector
+- New devices are unpaired by default
+
+### Migration
+- Existing devices will be marked as unpaired after upgrade
+- Users must manually pair devices to resume reading storage
 
 ### Fixed
 - Systemd service now points to `.venv` so installs run with the correct virtualenv

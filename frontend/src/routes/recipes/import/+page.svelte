@@ -12,7 +12,7 @@
 		error = null;
 
 		// Validate file
-		if (!file.name.endsWith('.xml')) {
+		if (!file.name.toLowerCase().endsWith('.xml')) {
 			error = 'Please upload a .xml BeerXML file';
 			return;
 		}

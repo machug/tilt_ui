@@ -119,6 +119,8 @@ class DeviceResponse(BaseModel):
     color: Optional[str]
     mac: Optional[str]
     created_at: datetime
+    paired: bool
+    paired_at: Optional[datetime]
 
     @classmethod
     def from_orm_with_calibration(cls, device: Device) -> "DeviceResponse":
@@ -141,6 +143,8 @@ class DeviceResponse(BaseModel):
             color=device.color,
             mac=device.mac,
             created_at=device.created_at,
+            paired=device.paired,
+            paired_at=device.paired_at,
         )
 
 

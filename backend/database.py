@@ -431,7 +431,7 @@ def _migrate_add_batch_id_to_control_events(conn):
 
 
 def _migrate_add_paired_to_tilts_and_devices(conn):
-    """Add paired boolean field to tilts and devices tables."""
+    """Add paired boolean field and paired_at timestamp to tilts and devices tables."""
     from sqlalchemy import inspect, text
     inspector = inspect(conn)
 
@@ -441,6 +441,15 @@ def _migrate_add_paired_to_tilts_and_devices(conn):
         if "paired" not in columns:
             conn.execute(text("ALTER TABLE tilts ADD COLUMN paired INTEGER DEFAULT 0"))
             print("Migration: Added paired column to tilts table")
+        if "paired_at" not in columns:
+            conn.execute(text("ALTER TABLE tilts ADD COLUMN paired_at TIMESTAMP"))
+            print("Migration: Added paired_at column to tilts table")
+
+        # Create index on paired field
+        indexes = [idx["name"] for idx in inspector.get_indexes("tilts")]
+        if "ix_tilts_paired" not in indexes:
+            conn.execute(text("CREATE INDEX ix_tilts_paired ON tilts (paired)"))
+            print("Migration: Added index on tilts.paired")
 
     # Migrate devices table
     if "devices" in inspector.get_table_names():
@@ -448,6 +457,15 @@ def _migrate_add_paired_to_tilts_and_devices(conn):
         if "paired" not in columns:
             conn.execute(text("ALTER TABLE devices ADD COLUMN paired INTEGER DEFAULT 0"))
             print("Migration: Added paired column to devices table")
+        if "paired_at" not in columns:
+            conn.execute(text("ALTER TABLE devices ADD COLUMN paired_at TIMESTAMP"))
+            print("Migration: Added paired_at column to devices table")
+
+        # Create index on paired field
+        indexes = [idx["name"] for idx in inspector.get_indexes("devices")]
+        if "ix_devices_paired" not in indexes:
+            conn.execute(text("CREATE INDEX ix_devices_paired ON devices (paired)"))
+            print("Migration: Added index on devices.paired")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

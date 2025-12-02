@@ -1,20 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchAllDevices, pairDevice, unpairDevice, type DeviceResponse } from '$lib/api/devices';
+	import { pairDevice, unpairDevice, type DeviceResponse } from '$lib/api/devices';
+	import { deviceCache } from '$lib/stores/deviceCache.svelte';
 
 	let devices = $state<DeviceResponse[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
 	onMount(async () => {
+		// Try to load from cache first for instant display
+		const cached = deviceCache.getCachedDevices();
+		if (cached) {
+			devices = cached;
+			loading = false;
+		}
 		await loadDevices();
 	});
 
-	async function loadDevices() {
+	async function loadDevices(forceRefresh = false) {
 		loading = true;
 		error = null;
 		try {
-			devices = await fetchAllDevices();
+			devices = await deviceCache.getDevices(forceRefresh);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load devices';
 		} finally {
@@ -26,7 +33,8 @@
 		error = null;
 		try {
 			await pairDevice(deviceId);
-			await loadDevices();
+			deviceCache.invalidate();
+			await loadDevices(true);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to pair device';
 		}
@@ -36,7 +44,8 @@
 		error = null;
 		try {
 			await unpairDevice(deviceId);
-			await loadDevices();
+			deviceCache.invalidate();
+			await loadDevices(true);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to unpair device';
 		}

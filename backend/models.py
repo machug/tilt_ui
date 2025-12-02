@@ -19,7 +19,8 @@ class Tilt(Base):
     beer_name: Mapped[str] = mapped_column(String(100), default="Untitled")
     original_gravity: Mapped[Optional[float]] = mapped_column()
     last_seen: Mapped[Optional[datetime]] = mapped_column()
-    paired: Mapped[bool] = mapped_column(default=False, server_default=false())
+    paired: Mapped[bool] = mapped_column(default=False, server_default=false(), index=True)
+    paired_at: Mapped[Optional[datetime]] = mapped_column()
 
     readings: Mapped[list["Reading"]] = relationship(back_populates="tilt", cascade="all, delete-orphan")
     calibration_points: Mapped[list["CalibrationPoint"]] = relationship(
@@ -76,7 +77,8 @@ class Device(Base):
     mac: Mapped[Optional[str]] = mapped_column(String(17))
 
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
-    paired: Mapped[bool] = mapped_column(default=False, server_default=false())
+    paired: Mapped[bool] = mapped_column(default=False, server_default=false(), index=True)
+    paired_at: Mapped[Optional[datetime]] = mapped_column()
 
     # Relationships
     readings: Mapped[list["Reading"]] = relationship(back_populates="device", cascade="all, delete-orphan")
@@ -326,6 +328,7 @@ class TiltResponse(TiltBase):
     original_gravity: Optional[float]
     last_seen: Optional[datetime]
     paired: bool = False
+    paired_at: Optional[datetime] = None
 
 
 class TiltReading(BaseModel):

@@ -196,6 +196,7 @@ async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Tilt not found")
 
     tilt.paired = True
+    tilt.paired_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(tilt)
 
@@ -215,6 +216,7 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Tilt not found")
 
     tilt.paired = False
+    tilt.paired_at = None
     await db.commit()
     await db.refresh(tilt)
 

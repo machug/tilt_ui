@@ -105,3 +105,82 @@ async def test_delete_recipe(client):
     # Verify deleted
     get_response = await client.get(f"/api/recipes/{recipe_id}")
     assert get_response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_invalid_extension(client):
+    """POST /api/recipes/import should reject non-XML file extensions."""
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.txt", "not xml content", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert "extension" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_invalid_mime_type(client):
+    """POST /api/recipes/import should reject invalid MIME types."""
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.xml", "content", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert "xml" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_file_too_large(client):
+    """POST /api/recipes/import should reject files larger than 1MB."""
+    # Create content larger than 1MB
+    large_content = "x" * (1_000_001)
+
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.xml", large_content, "text/xml")},
+    )
+
+    assert response.status_code == 400
+    assert "large" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_invalid_xml(client):
+    """POST /api/recipes/import should reject malformed XML."""
+    invalid_xml = "<RECIPES><RECIPE>unclosed tag"
+
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.xml", invalid_xml, "text/xml")},
+    )
+
+    assert response.status_code == 400
+    assert "beerxml" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_non_utf8(client):
+    """POST /api/recipes/import should reject non-UTF-8 encoded files."""
+    # Use Latin-1 encoding
+    non_utf8_content = b"<?xml version='1.0'?><RECIPES><RECIPE><NAME>\xe9</NAME></RECIPE></RECIPES>"
+
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.xml", non_utf8_content, "text/xml")},
+    )
+
+    assert response.status_code == 400
+    assert "utf-8" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_import_beerxml_empty_file(client):
+    """POST /api/recipes/import should reject empty XML files."""
+    response = await client.post(
+        "/api/recipes/import",
+        files={"file": ("recipe.xml", "", "text/xml")},
+    )
+
+    assert response.status_code == 400

@@ -1,0 +1,1 @@
+import{F as u,G as o,af as _,n as t,J as g,T as p,a5 as i,Q as l,I as n,R as m}from"./Clf_rkwX.js";function E(d,r){let a=null,f=t;var s;if(t){a=m;for(var e=g(document.head);e!==null&&(e.nodeType!==p||e.data!==d);)e=i(e);if(e===null)l(!1);else{var y=i(e);e.remove(),n(y)}}t||(s=document.head.appendChild(u()));try{o(()=>r(s),_)}finally{f&&(l(!0),n(a))}}export{E as h};

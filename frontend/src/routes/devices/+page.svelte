@@ -82,7 +82,7 @@
 {:else if error}
 	<div class="error-state">
 		<p>{error}</p>
-		<button onclick={loadDevices} class="btn-secondary">Retry</button>
+		<button onclick={() => loadDevices(true)} class="btn-secondary">Retry</button>
 	</div>
 {:else}
 	<div class="devices-container">

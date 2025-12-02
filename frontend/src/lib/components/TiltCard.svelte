@@ -280,10 +280,10 @@
 					<button
 						type="button"
 						class="batch-link"
-						onclick={() => goto(`/batches/${linkedBatch.id}`)}
+						onclick={() => goto(`/batches/${linkedBatch!.id}`)}
 					>
-						<span class="batch-status-dot" style="background: {linkedBatch.status === 'fermenting' ? '#f59e0b' : linkedBatch.status === 'conditioning' ? '#8b5cf6' : 'var(--text-muted)'}"></span>
-						Batch #{linkedBatch.batch_number}
+						<span class="batch-status-dot" style="background: {linkedBatch!.status === 'fermenting' ? '#f59e0b' : linkedBatch!.status === 'conditioning' ? '#8b5cf6' : 'var(--text-muted)'}"></span>
+						Batch #{linkedBatch!.batch_number}
 						<svg class="batch-link-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 						</svg>

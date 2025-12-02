@@ -130,7 +130,7 @@
 						{#if recipe.yeast_lab}
 							<p class="yeast-lab">{recipe.yeast_lab}</p>
 						{/if}
-						{#if recipe.yeast_temp_min !== undefined && recipe.yeast_temp_max !== undefined}
+						{#if recipe.yeast_temp_min != null && recipe.yeast_temp_max != null}
 							<p class="yeast-temp">
 								Temperature: {recipe.yeast_temp_min.toFixed(0)}-{recipe.yeast_temp_max.toFixed(0)}°C
 							</p>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-12-02
+
 ### Added
 - Recipe library UI for BeerXML import and management (#32)
   - Import page with drag-and-drop BeerXML file upload

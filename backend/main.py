@@ -15,7 +15,7 @@ from sqlalchemy import select, desc
 
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
-from .models import Reading, Tilt
+from .models import Reading, Tilt, serialize_datetime_to_utc
 from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, recipes, system, tilts
 from .ambient_poller import start_ambient_poller, stop_ambient_poller
 from .temp_controller import start_temp_controller, stop_temp_controller
@@ -89,7 +89,7 @@ async def handle_tilt_reading(reading: TiltReading):
             "temp": temp_calibrated,
             "temp_raw": reading.temp_f,
             "rssi": reading.rssi,
-            "last_seen": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "last_seen": serialize_datetime_to_utc(datetime.now(timezone.utc)),
             "paired": tilt.paired,  # Include pairing status
         }
 

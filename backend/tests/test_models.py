@@ -3,8 +3,9 @@
 import pytest
 from sqlalchemy import select
 from datetime import datetime, timezone
+import json
 
-from backend.models import Tilt, Device, TiltResponse
+from backend.models import Tilt, Device, TiltResponse, serialize_datetime_to_utc, ReadingResponse, BatchResponse
 
 
 @pytest.mark.asyncio
@@ -55,3 +56,96 @@ def test_tilt_response_includes_paired():
         paired=True
     )
     assert response.paired is True
+
+
+# Datetime serialization tests
+def test_serialize_datetime_to_utc_with_naive_datetime():
+    """Test serialization of naive datetime assumes UTC."""
+    dt = datetime(2025, 12, 2, 22, 28, 45, 589178)
+    result = serialize_datetime_to_utc(dt)
+    assert result == "2025-12-02T22:28:45.589178Z"
+
+
+def test_serialize_datetime_to_utc_with_utc_aware():
+    """Test serialization of UTC-aware datetime."""
+    dt = datetime(2025, 12, 2, 22, 28, 45, 589178, tzinfo=timezone.utc)
+    result = serialize_datetime_to_utc(dt)
+    assert result == "2025-12-02T22:28:45.589178Z"
+
+
+def test_serialize_datetime_to_utc_handles_none():
+    """Test serialization handles None gracefully."""
+    assert serialize_datetime_to_utc(None) is None
+
+
+def test_serialize_datetime_to_utc_with_zero_microseconds():
+    """Test serialization includes .000000 for datetimes without microseconds."""
+    dt = datetime(2025, 12, 2, 22, 28, 45, tzinfo=timezone.utc)
+    result = serialize_datetime_to_utc(dt)
+    assert result == "2025-12-02T22:28:45.000000Z"
+
+
+def test_tilt_response_serialization_includes_z_suffix():
+    """Test TiltResponse serializes datetimes with Z suffix."""
+    response = TiltResponse(
+        id="tilt-red",
+        color="RED",
+        beer_name="Test Beer",
+        mac="AA:BB:CC:DD:EE:FF",
+        original_gravity=1.050,
+        last_seen=datetime(2025, 12, 2, 22, 28, 45, 589178, tzinfo=timezone.utc),
+        paired=True,
+        paired_at=datetime(2025, 12, 2, 22, 26, 59, 374325, tzinfo=timezone.utc)
+    )
+    json_data = response.model_dump_json()
+    assert '"last_seen":"2025-12-02T22:28:45.589178Z"' in json_data
+    assert '"paired_at":"2025-12-02T22:26:59.374325Z"' in json_data
+
+
+def test_reading_response_serialization_includes_z_suffix():
+    """Test ReadingResponse serializes timestamp with Z suffix."""
+    response = ReadingResponse(
+        id=1,
+        timestamp=datetime(2025, 12, 2, 22, 28, 45, 589178, tzinfo=timezone.utc),
+        sg_raw=1.050,
+        sg_calibrated=1.051,
+        temp_raw=68.0,
+        temp_calibrated=68.5,
+        rssi=-75,
+        status="valid"
+    )
+    json_data = response.model_dump_json()
+    assert '"timestamp":"2025-12-02T22:28:45.589178Z"' in json_data
+
+
+def test_batch_response_serialization_includes_z_suffix():
+    """Test BatchResponse serializes multiple datetime fields with Z suffix."""
+    response = BatchResponse(
+        id=1,
+        status="fermenting",
+        brew_date=datetime(2025, 12, 1, 10, 0, 0, tzinfo=timezone.utc),
+        start_time=datetime(2025, 12, 1, 12, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime(2025, 12, 1, 9, 0, 0, tzinfo=timezone.utc)
+    )
+    json_data = response.model_dump_json()
+    assert '"brew_date":"2025-12-01T10:00:00.000000Z"' in json_data
+    assert '"start_time":"2025-12-01T12:00:00.000000Z"' in json_data
+    assert '"created_at":"2025-12-01T09:00:00.000000Z"' in json_data
+
+
+def test_tilt_response_with_none_datetimes():
+    """Test TiltResponse handles None datetime values correctly."""
+    response = TiltResponse(
+        id="tilt-red",
+        color="RED",
+        beer_name="Test Beer",
+        mac="AA:BB:CC:DD:EE:FF",
+        original_gravity=None,
+        last_seen=None,
+        paired=False,
+        paired_at=None
+    )
+    json_data = response.model_dump_json()
+    parsed = json.loads(json_data)
+    assert parsed["last_seen"] is None
+    assert parsed["paired_at"] is None

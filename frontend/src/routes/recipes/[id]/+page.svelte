@@ -11,9 +11,18 @@
 	let showDeleteConfirm = $state(false);
 	let deleting = $state(false);
 
-	let recipeId = $derived(parseInt($page.params.id ?? '0', 10));
+	let recipeId = $derived(() => {
+		const id = parseInt($page.params.id || '', 10);
+		return isNaN(id) || id <= 0 ? null : id;
+	});
 
 	onMount(async () => {
+		if (!recipeId) {
+			error = 'Invalid recipe ID';
+			loading = false;
+			return;
+		}
+
 		try {
 			recipe = await fetchRecipe(recipeId);
 		} catch (e) {

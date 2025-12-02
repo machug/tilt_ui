@@ -13,6 +13,9 @@ from ..services.beerxml_parser import parse_beerxml
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
+# File upload constraints
+MAX_FILE_SIZE = 1_000_000  # 1MB in bytes
+
 
 @router.get("", response_model=list[RecipeResponse])
 async def list_recipes(
@@ -97,7 +100,7 @@ async def import_beerxml(
 
     # Read file content with size validation
     content = await file.read()
-    if len(content) > 1_000_000:
+    if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 1MB)")
 
     # Parse BeerXML

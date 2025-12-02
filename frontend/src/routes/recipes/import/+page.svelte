@@ -2,6 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { importBeerXML } from '$lib/api';
 
+	const MAX_FILE_SIZE = 1_000_000; // 1MB in bytes
+
 	let uploading = $state(false);
 	let error = $state<string | null>(null);
 	let dragActive = $state(false);
@@ -15,7 +17,7 @@
 			return;
 		}
 
-		if (file.size > 1_000_000) {
+		if (file.size > MAX_FILE_SIZE) {
 			error = 'File must be smaller than 1MB';
 			return;
 		}
@@ -63,6 +65,14 @@
 			handleFileUpload(file);
 		}
 	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			const fileInput = document.querySelector('.file-input') as HTMLInputElement;
+			fileInput?.click();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -92,8 +102,10 @@
 			ondrop={handleDrop}
 			ondragover={handleDragOver}
 			ondragleave={handleDragLeave}
+			onkeydown={handleKeyDown}
 			role="button"
 			tabindex="0"
+			aria-label="Upload BeerXML file by dropping or clicking"
 		>
 			{#if uploading}
 				<div class="spinner"></div>

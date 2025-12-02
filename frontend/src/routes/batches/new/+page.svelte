@@ -1,8 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import type { BatchCreate } from '$lib/api';
 	import { createBatch } from '$lib/api';
 	import BatchForm from '$lib/components/BatchForm.svelte';
+
+	let recipeId = $derived(
+		$page.url.searchParams.get('recipe_id')
+			? parseInt($page.url.searchParams.get('recipe_id')!, 10)
+			: undefined
+	);
 
 	async function handleSubmit(data: BatchCreate) {
 		const batch = await createBatch(data);
@@ -29,7 +36,7 @@
 	</div>
 
 	<div class="form-container">
-		<BatchForm onSubmit={handleSubmit} onCancel={handleCancel} />
+		<BatchForm onSubmit={handleSubmit} onCancel={handleCancel} initialRecipeId={recipeId} />
 	</div>
 </div>
 

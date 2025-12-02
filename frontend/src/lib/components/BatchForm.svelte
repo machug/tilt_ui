@@ -10,9 +10,10 @@
 		batch?: BatchResponse;
 		onSubmit: (data: BatchCreate | BatchUpdate) => Promise<void>;
 		onCancel: () => void;
+		initialRecipeId?: number;
 	}
 
-	let { batch, onSubmit, onCancel }: Props = $props();
+	let { batch, onSubmit, onCancel, initialRecipeId }: Props = $props();
 
 	// Form state
 	let name = $state(batch?.name || '');
@@ -141,6 +142,16 @@
 	$effect(() => {
 		if (haEnabled && heaterEntities.length === 0 && !loadingHeaters) {
 			loadHeaterEntities();
+		}
+	});
+
+	// Auto-select recipe from query parameter
+	$effect(() => {
+		if (initialRecipeId && recipes.length > 0 && !selectedRecipe) {
+			const recipe = recipes.find((r) => r.id === initialRecipeId);
+			if (recipe) {
+				handleRecipeSelect(recipe);
+			}
 		}
 	});
 

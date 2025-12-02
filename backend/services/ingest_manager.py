@@ -17,7 +17,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..ingest import AdapterRouter, HydrometerReading, ReadingStatus
-from ..models import Device, Reading
+from ..models import Device, Reading, serialize_datetime_to_utc
 from ..state import latest_readings
 from ..websocket import manager as ws_manager
 from .calibration import calibration_service
@@ -270,7 +270,7 @@ class IngestManager:
             "temp": reading.temperature,
             "temp_raw": reading.temperature_raw,
             "rssi": reading.rssi,
-            "last_seen": timestamp.isoformat(),
+            "last_seen": serialize_datetime_to_utc(timestamp),
             # Extended fields for multi-hydrometer support
             "device_type": reading.device_type,
             "angle": reading.angle,

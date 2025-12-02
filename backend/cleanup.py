@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, func, select
 
 from .database import async_session_factory
-from .models import Reading
+from .models import Reading, serialize_datetime_to_utc
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ async def get_reading_stats() -> dict:
 
         return {
             "total_readings": total,
-            "oldest_reading": oldest.isoformat() if oldest else None,
-            "newest_reading": newest.isoformat() if newest else None,
+            "oldest_reading": serialize_datetime_to_utc(oldest) if oldest else None,
+            "newest_reading": serialize_datetime_to_utc(newest) if newest else None,
         }
 
 

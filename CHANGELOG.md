@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Timezone Display Bug** (#42) - Fixed "Last Seen" times showing incorrect values (e.g., "11h ago" when device is actively transmitting)
+  - All datetime fields now serialize with explicit UTC timezone indicator ('Z' suffix) per RFC 3339
+  - Prevents JavaScript from misinterpreting UTC timestamps as local time
+  - Applied consistently across all API responses, WebSocket broadcasts, and CSV exports
+  - Added `serialize_datetime_to_utc()` helper function with comprehensive test coverage
+
 ## [2.3.0] - 2025-12-02
 
 ### Added

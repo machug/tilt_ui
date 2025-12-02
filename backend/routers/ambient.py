@@ -8,7 +8,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db, async_session_factory
-from ..models import AmbientReading, AmbientReadingResponse
+from ..models import AmbientReading, AmbientReadingResponse, serialize_datetime_to_utc
 from ..services.ha_client import get_ha_client
 from .config import get_config_value
 
@@ -54,7 +54,7 @@ async def get_current_ambient():
         return {
             "temperature": temperature,
             "humidity": humidity,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": serialize_datetime_to_utc(datetime.now(timezone.utc))
         }
 
 

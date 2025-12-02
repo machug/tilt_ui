@@ -2,11 +2,35 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+
+
+def serialize_datetime_to_utc(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize datetime to ISO format with 'Z' suffix to indicate UTC.
+
+    This ensures JavaScript Date() correctly interprets timestamps as UTC rather
+    than local time, preventing timezone display bugs.
+
+    Handles three cases defensively:
+    - None: Returns None (for optional fields)
+    - Naive datetime: Assumes UTC (database stores all times in UTC)
+    - Timezone-aware non-UTC: Converts to UTC (defensive, should not occur in practice)
+    """
+    if dt is None:
+        return None
+    # Ensure datetime is in UTC
+    if dt.tzinfo is None:
+        # Naive datetime - assume UTC since database stores everything in UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    elif dt.tzinfo != timezone.utc:
+        # Non-UTC timezone - convert to UTC (defensive, should not happen)
+        dt = dt.astimezone(timezone.utc)
+    # Format as ISO with 'Z' suffix per RFC 3339
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # SQLAlchemy Models
@@ -330,6 +354,10 @@ class TiltResponse(TiltBase):
     paired: bool = False
     paired_at: Optional[datetime] = None
 
+    @field_serializer('last_seen', 'paired_at')
+    def serialize_dt(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_to_utc(dt)
+
 
 class TiltReading(BaseModel):
     id: str
@@ -342,6 +370,10 @@ class TiltReading(BaseModel):
     last_seen: datetime
     beer_name: str
     paired: bool
+
+    @field_serializer('last_seen')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
 
 
 class ReadingResponse(BaseModel):
@@ -356,6 +388,10 @@ class ReadingResponse(BaseModel):
     rssi: Optional[int]
     status: Optional[str] = None  # 'valid', 'invalid', 'uncalibrated', 'incomplete'
 
+    @field_serializer('timestamp')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
+
 
 class AmbientReadingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -364,6 +400,10 @@ class AmbientReadingResponse(BaseModel):
     timestamp: datetime
     temperature: Optional[float]
     humidity: Optional[float]
+
+    @field_serializer('timestamp')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
 
 
 class ControlEventResponse(BaseModel):
@@ -377,6 +417,10 @@ class ControlEventResponse(BaseModel):
     wort_temp: Optional[float]
     ambient_temp: Optional[float]
     target_temp: Optional[float]
+
+    @field_serializer('timestamp')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
 
 
 class CalibrationPointCreate(BaseModel):
@@ -576,6 +620,10 @@ class RecipeResponse(BaseModel):
     created_at: datetime
     style: Optional[StyleResponse] = None
 
+    @field_serializer('created_at')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
+
 
 class BatchCreate(BaseModel):
     recipe_id: Optional[int] = None
@@ -694,6 +742,10 @@ class BatchResponse(BaseModel):
     heater_entity_id: Optional[str] = None
     temp_target: Optional[float] = None
     temp_hysteresis: Optional[float] = None
+
+    @field_serializer('brew_date', 'start_time', 'end_time', 'created_at')
+    def serialize_dt(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_to_utc(dt)
 
 
 class BatchProgressResponse(BaseModel):

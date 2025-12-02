@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from .database import async_session_factory
-from .models import AmbientReading
+from .models import AmbientReading, serialize_datetime_to_utc
 from .routers.config import get_config_value
 from .services.ha_client import get_ha_client, init_ha_client
 from .websocket import manager as ws_manager
@@ -87,7 +87,7 @@ async def poll_ambient() -> None:
                         "type": "ambient",
                         "temperature": temperature,
                         "humidity": humidity,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
+                        "timestamp": serialize_datetime_to_utc(datetime.now(timezone.utc))
                     })
 
                     logger.debug(f"Ambient: temp={temperature}, humidity={humidity}")

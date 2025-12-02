@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import select
 
 from .database import async_session_factory
-from .models import Batch, ControlEvent, AmbientReading
+from .models import Batch, ControlEvent, AmbientReading, serialize_datetime_to_utc
 from .routers.config import get_config_value
 from .services.ha_client import get_ha_client, init_ha_client
 from .websocket import manager as ws_manager
@@ -181,7 +181,7 @@ async def log_control_event(
         "ambient_temp": ambient_temp,
         "target_temp": target_temp,
         "batch_id": batch_id,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": serialize_datetime_to_utc(datetime.now(timezone.utc))
     })
 
     batch_info = f", batch_id={batch_id}" if batch_id else ""
@@ -466,7 +466,7 @@ def get_batch_control_status(batch_id: int) -> dict:
         "heater_entity": batch_state.get("entity_id") if batch_state else None,
         "override_active": override is not None,
         "override_state": override.get("state") if override else None,
-        "override_until": override.get("until").isoformat() if override and override.get("until") else None,
+        "override_until": serialize_datetime_to_utc(override.get("until")) if override and override.get("until") else None,
         "state_available": state_available,
     }
 

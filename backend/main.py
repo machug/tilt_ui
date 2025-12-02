@@ -15,7 +15,7 @@ from sqlalchemy import select, desc
 
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
-from .models import Reading, Tilt
+from .models import Reading, Tilt, serialize_datetime_to_utc
 from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, recipes, system, tilts
 from .ambient_poller import start_ambient_poller, stop_ambient_poller
 from .temp_controller import start_temp_controller, stop_temp_controller
@@ -89,7 +89,7 @@ async def handle_tilt_reading(reading: TiltReading):
             "temp": temp_calibrated,
             "temp_raw": reading.temp_f,
             "rssi": reading.rssi,
-            "last_seen": datetime.now(timezone.utc).isoformat(),
+            "last_seen": serialize_datetime_to_utc(datetime.now(timezone.utc)),
             "paired": tilt.paired,  # Include pairing status
         }
 
@@ -219,7 +219,7 @@ async def download_log():
             for reading in result.scalars():
                 tilt = tilts_map.get(reading.tilt_id)
                 writer.writerow([
-                    reading.timestamp.isoformat() if reading.timestamp else "",
+                    serialize_datetime_to_utc(reading.timestamp) if reading.timestamp else "",
                     reading.tilt_id,
                     tilt.color if tilt else "",
                     tilt.beer_name if tilt else "",
@@ -267,8 +267,8 @@ async def get_stats():
 
         return {
             "total_readings": total_readings,
-            "oldest_reading": oldest_time.isoformat() if oldest_time else None,
-            "newest_reading": newest_time.isoformat() if newest_time else None,
+            "oldest_reading": serialize_datetime_to_utc(oldest_time) if oldest_time else None,
+            "newest_reading": serialize_datetime_to_utc(newest_time) if newest_time else None,
             "estimated_size_bytes": estimated_size_bytes,
         }
 

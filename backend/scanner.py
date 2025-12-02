@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
+from .models import serialize_datetime_to_utc
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -57,7 +59,7 @@ class TiltReading:
             "temp_f": self.temp_f,
             "sg": self.sg,
             "rssi": self.rssi,
-            "timestamp": self.timestamp.isoformat(),
+            "timestamp": serialize_datetime_to_utc(self.timestamp),
         }
 
 

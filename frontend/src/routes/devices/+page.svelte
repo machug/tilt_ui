@@ -23,6 +23,7 @@
 	}
 
 	async function handlePair(deviceId: string) {
+		error = null;
 		try {
 			await pairDevice(deviceId);
 			await loadDevices();
@@ -32,6 +33,7 @@
 	}
 
 	async function handleUnpair(deviceId: string) {
+		error = null;
 		try {
 			await unpairDevice(deviceId);
 			await loadDevices();

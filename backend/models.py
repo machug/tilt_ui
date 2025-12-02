@@ -338,6 +338,7 @@ class TiltReading(BaseModel):
     rssi: int
     last_seen: datetime
     beer_name: str
+    paired: bool
 
 
 class ReadingResponse(BaseModel):

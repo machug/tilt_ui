@@ -10,15 +10,26 @@ from .database import Base
 
 
 def serialize_datetime_to_utc(dt: Optional[datetime]) -> Optional[str]:
-    """Serialize datetime to ISO format with 'Z' suffix to indicate UTC."""
+    """Serialize datetime to ISO format with 'Z' suffix to indicate UTC.
+
+    This ensures JavaScript Date() correctly interprets timestamps as UTC rather
+    than local time, preventing timezone display bugs.
+
+    Handles three cases defensively:
+    - None: Returns None (for optional fields)
+    - Naive datetime: Assumes UTC (database stores all times in UTC)
+    - Timezone-aware non-UTC: Converts to UTC (defensive, should not occur in practice)
+    """
     if dt is None:
         return None
     # Ensure datetime is in UTC
     if dt.tzinfo is None:
+        # Naive datetime - assume UTC since database stores everything in UTC
         dt = dt.replace(tzinfo=timezone.utc)
     elif dt.tzinfo != timezone.utc:
+        # Non-UTC timezone - convert to UTC (defensive, should not happen)
         dt = dt.astimezone(timezone.utc)
-    # Format as ISO with 'Z' suffix
+    # Format as ISO with 'Z' suffix per RFC 3339
     return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 

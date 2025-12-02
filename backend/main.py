@@ -219,7 +219,7 @@ async def download_log():
             for reading in result.scalars():
                 tilt = tilts_map.get(reading.tilt_id)
                 writer.writerow([
-                    reading.timestamp.isoformat() if reading.timestamp else "",
+                    serialize_datetime_to_utc(reading.timestamp) if reading.timestamp else "",
                     reading.tilt_id,
                     tilt.color if tilt else "",
                     tilt.beer_name if tilt else "",

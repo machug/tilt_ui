@@ -4,6 +4,7 @@
 	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { configState } from '$lib/stores/config.svelte';
+	import RecipeSelector from './RecipeSelector.svelte';
 
 	interface Props {
 		batch?: BatchResponse;
@@ -34,6 +35,7 @@
 	let loadingHeaters = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
+	let selectedRecipe = $state<RecipeResponse | null>(null);
 
 	// Get available devices from tilts store
 	let availableDevices = $derived(Array.from(tiltsState.tilts.values()));
@@ -71,6 +73,20 @@
 			console.error('Failed to load heater entities:', e);
 		} finally {
 			loadingHeaters = false;
+		}
+	}
+
+	function handleRecipeSelect(recipe: RecipeResponse | null) {
+		selectedRecipe = recipe;
+		if (recipe) {
+			// Auto-fill form from recipe
+			name = recipe.name;
+			recipeId = recipe.id;
+			if (recipe.og_target) {
+				measuredOg = recipe.og_target.toString();
+			}
+		} else {
+			recipeId = null;
 		}
 	}
 
@@ -152,26 +168,26 @@
 	<div class="form-body">
 		<!-- Recipe Selection (only for new batches) -->
 		{#if !isEditMode}
-			<div class="form-group">
-				<label class="form-label" for="recipe">Recipe</label>
-				<select
-					id="recipe"
-					class="form-select"
-					bind:value={recipeId}
-					disabled={loadingRecipes}
-				>
-					<option value={null}>No recipe (manual batch)</option>
-					{#each recipes as recipe}
-						<option value={recipe.id}>
-							{recipe.name}
-							{#if recipe.og_target}
-								(OG: {recipe.og_target.toFixed(3)})
+			<RecipeSelector
+				selectedRecipeId={selectedRecipe?.id}
+				onSelect={handleRecipeSelect}
+			/>
+
+			{#if selectedRecipe}
+				<div class="recipe-reference">
+					<p class="reference-label">From Recipe:</p>
+					{#if selectedRecipe.yeast_name}
+						<p class="reference-text">
+							Yeast: {selectedRecipe.yeast_name}
+							{#if selectedRecipe.yeast_temp_min && selectedRecipe.yeast_temp_max}
+								({selectedRecipe.yeast_temp_min.toFixed(0)}-{selectedRecipe.yeast_temp_max.toFixed(
+									0
+								)}°C)
 							{/if}
-						</option>
-					{/each}
-				</select>
-				<span class="form-hint">Select a recipe to auto-fill targets</span>
-			</div>
+						</p>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 
 		<!-- Batch Name -->
@@ -548,6 +564,29 @@
 		to {
 			transform: rotate(360deg);
 		}
+	}
+
+	.recipe-reference {
+		padding: var(--space-3);
+		background: var(--recipe-accent-muted);
+		border: 1px solid var(--recipe-accent-border);
+		border-radius: 6px;
+	}
+
+	.reference-label {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--recipe-accent);
+		margin: 0 0 var(--space-1) 0;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.reference-text {
+		font-size: 13px;
+		color: var(--text-secondary);
+		font-family: var(--font-mono);
+		margin: 0;
 	}
 
 	@media (max-width: 480px) {

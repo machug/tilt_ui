@@ -28,6 +28,16 @@ _batch_heater_states: dict[int, dict] = {}
 _batch_overrides: dict[int, dict] = {}
 
 # Track HA config to detect changes
+
+
+def cleanup_batch_state(batch_id: int) -> None:
+    """Clean up runtime state for a batch (called when batch leaves fermenting status)."""
+    if batch_id in _batch_heater_states:
+        logger.debug(f"Cleaning up heater state for batch {batch_id}")
+        del _batch_heater_states[batch_id]
+    if batch_id in _batch_overrides:
+        logger.debug(f"Cleaning up override for batch {batch_id}")
+        del _batch_overrides[batch_id]
 _last_ha_url: Optional[str] = None
 _last_ha_token: Optional[str] = None
 

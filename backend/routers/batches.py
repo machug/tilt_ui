@@ -202,6 +202,11 @@ async def update_batch(
             batch.start_time = datetime.now(timezone.utc)
         elif update.status in ["conditioning", "completed"] and old_status == "fermenting":
             batch.end_time = datetime.now(timezone.utc)
+
+        # Clean up runtime state when batch leaves fermenting status
+        if old_status == "fermenting" and update.status != "fermenting":
+            from ..temp_controller import cleanup_batch_state
+            cleanup_batch_state(batch_id)
     if update.device_id is not None:
         batch.device_id = update.device_id
     if update.brew_date is not None:

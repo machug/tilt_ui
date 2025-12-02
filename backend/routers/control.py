@@ -213,6 +213,27 @@ async def set_override(request: OverrideRequest, db: AsyncSession = Depends(get_
     - batch_id: required for batch-specific override
     """
     temp_control_enabled = await get_config_value(db, "temp_control_enabled")
+    # Require batch_id for override (multi-batch mode) - validate early
+    if request.batch_id is None:
+        return OverrideResponse(
+            success=False,
+            message="batch_id is required for heater override",
+            override_state=None,
+            override_until=None,
+            batch_id=None
+        )
+
+    # Verify batch exists and has heater configured - validate early before other checks
+    batch = await db.get(Batch, request.batch_id)
+    if not batch:
+        return OverrideResponse(
+            success=False,
+            message=f"Batch {request.batch_id} not found",
+            override_state=None,
+            override_until=None,
+            batch_id=request.batch_id
+        )
+
     if not temp_control_enabled:
         return OverrideResponse(
             success=False,
@@ -226,27 +247,6 @@ async def set_override(request: OverrideRequest, db: AsyncSession = Depends(get_
         return OverrideResponse(
             success=False,
             message="State must be 'on', 'off', or null",
-            override_state=None,
-            override_until=None,
-            batch_id=request.batch_id
-        )
-
-    # Require batch_id for override (multi-batch mode)
-    if request.batch_id is None:
-        return OverrideResponse(
-            success=False,
-            message="batch_id is required for heater override",
-            override_state=None,
-            override_until=None,
-            batch_id=None
-        )
-
-    # Verify batch exists and has heater configured
-    batch = await db.get(Batch, request.batch_id)
-    if not batch:
-        return OverrideResponse(
-            success=False,
-            message=f"Batch {request.batch_id} not found",
             override_state=None,
             override_until=None,
             batch_id=request.batch_id

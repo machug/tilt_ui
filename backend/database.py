@@ -386,6 +386,30 @@ def _migrate_add_batch_heater_columns(conn):
         except Exception as e:
             print(f"Migration: Skipping index creation - {e}")
 
+    # Add partial unique index to prevent heater conflicts at database level
+    if "idx_fermenting_heater_unique" not in indexes:
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX idx_fermenting_heater_unique "
+                "ON batches (heater_entity_id) "
+                "WHERE status = 'fermenting' AND heater_entity_id IS NOT NULL"
+            ))
+            print("Migration: Added unique constraint for fermenting batch heaters")
+        except Exception as e:
+            print(f"Migration: Skipping unique heater index creation - {e}")
+
+    # Add partial unique index to prevent device conflicts at database level
+    if "idx_fermenting_device_unique" not in indexes:
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX idx_fermenting_device_unique "
+                "ON batches (device_id) "
+                "WHERE status = 'fermenting' AND device_id IS NOT NULL"
+            ))
+            print("Migration: Added unique constraint for fermenting batch devices")
+        except Exception as e:
+            print(f"Migration: Skipping unique device index creation - {e}")
+
 
 def _migrate_add_batch_id_to_control_events(conn):
     """Add batch_id column to control_events table if not present."""

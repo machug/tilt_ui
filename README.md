@@ -32,6 +32,14 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8080
 - **Data Export** - Download all readings as CSV
 - **Dark Theme** - Easy on the eyes during late-night brew checks
 
+## Device Pairing (v2.3.0+)
+
+Tilt devices must be **paired** before readings are logged. This prevents data pollution from nearby devices.
+
+- Navigate to **Devices** page to pair/unpair devices
+- Only paired devices log readings and can be assigned to batches
+- Unpaired devices still appear on dashboard with live readings
+
 ## Requirements
 
 - Raspberry Pi (3B+ or newer recommended)

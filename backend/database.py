@@ -55,6 +55,7 @@ async def init_db():
         await conn.run_sync(_migrate_add_batch_id_to_readings)  # Add this line (after batches table exists)
         await conn.run_sync(_migrate_add_batch_heater_columns)  # Add heater control columns to batches
         await conn.run_sync(_migrate_add_batch_id_to_control_events)  # Add batch_id to control_events
+        await conn.run_sync(_migrate_add_paired_to_tilts_and_devices)  # Add paired field
 
         # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
@@ -427,6 +428,44 @@ def _migrate_add_batch_id_to_control_events(conn):
             print("Migration: Added batch_id column to control_events table")
         except Exception as e:
             print(f"Migration: Skipping batch_id column - {e}")
+
+
+def _migrate_add_paired_to_tilts_and_devices(conn):
+    """Add paired boolean field and paired_at timestamp to tilts and devices tables."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    # Migrate tilts table
+    if "tilts" in inspector.get_table_names():
+        columns = [c["name"] for c in inspector.get_columns("tilts")]
+        if "paired" not in columns:
+            conn.execute(text("ALTER TABLE tilts ADD COLUMN paired INTEGER DEFAULT 0"))
+            print("Migration: Added paired column to tilts table")
+        if "paired_at" not in columns:
+            conn.execute(text("ALTER TABLE tilts ADD COLUMN paired_at TIMESTAMP"))
+            print("Migration: Added paired_at column to tilts table")
+
+        # Create index on paired field
+        indexes = [idx["name"] for idx in inspector.get_indexes("tilts")]
+        if "ix_tilts_paired" not in indexes:
+            conn.execute(text("CREATE INDEX ix_tilts_paired ON tilts (paired)"))
+            print("Migration: Added index on tilts.paired")
+
+    # Migrate devices table
+    if "devices" in inspector.get_table_names():
+        columns = [c["name"] for c in inspector.get_columns("devices")]
+        if "paired" not in columns:
+            conn.execute(text("ALTER TABLE devices ADD COLUMN paired INTEGER DEFAULT 0"))
+            print("Migration: Added paired column to devices table")
+        if "paired_at" not in columns:
+            conn.execute(text("ALTER TABLE devices ADD COLUMN paired_at TIMESTAMP"))
+            print("Migration: Added paired_at column to devices table")
+
+        # Create index on paired field
+        indexes = [idx["name"] for idx in inspector.get_indexes("devices")]
+        if "ix_devices_paired" not in indexes:
+            conn.execute(text("CREATE INDEX ix_devices_paired ON devices (paired)"))
+            print("Migration: Added index on devices.paired")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

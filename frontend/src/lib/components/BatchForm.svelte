@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus, HeaterEntity } from '$lib/api';
 	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
-	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { configState } from '$lib/stores/config.svelte';
+	import { fetchAllDevices, type DeviceResponse } from '$lib/api/devices';
 	import RecipeSelector from './RecipeSelector.svelte';
 
 	interface Props {
@@ -32,14 +32,13 @@
 
 	let recipes = $state<RecipeResponse[]>([]);
 	let heaterEntities = $state<HeaterEntity[]>([]);
+	let availableDevices = $state<DeviceResponse[]>([]);
 	let loadingRecipes = $state(true);
 	let loadingHeaters = $state(false);
+	let loadingDevices = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 	let selectedRecipe = $state<RecipeResponse | null>(null);
-
-	// Get available devices from tilts store
-	let availableDevices = $derived(Array.from(tiltsState.tilts.values()));
 
 	// Check if HA is enabled
 	let haEnabled = $derived(configState.config.ha_enabled);
@@ -62,6 +61,18 @@
 			console.error('Failed to load recipes:', e);
 		} finally {
 			loadingRecipes = false;
+		}
+	}
+
+	async function loadDevices() {
+		loadingDevices = true;
+		try {
+			// Fetch only paired devices for batch assignment
+			availableDevices = await fetchAllDevices(true);
+		} catch (e) {
+			console.error('Failed to load devices:', e);
+		} finally {
+			loadingDevices = false;
 		}
 	}
 
@@ -157,6 +168,7 @@
 
 	onMount(() => {
 		loadRecipes();
+		loadDevices();
 		loadHeaterEntities();
 	});
 </script>
@@ -228,18 +240,26 @@
 		<!-- Device -->
 		<div class="form-group">
 			<label class="form-label" for="device">Tracking Device</label>
-			<select id="device" class="form-select" bind:value={deviceId}>
-				<option value={null}>No device assigned</option>
-				{#each availableDevices as device}
-					<option value={device.id}>
-						{device.color} Tilt
-						{#if device.beer_name && device.beer_name !== 'Untitled'}
-							- {device.beer_name}
-						{/if}
-					</option>
-				{/each}
-			</select>
-			<span class="form-hint">Link a Tilt to track live gravity and temperature</span>
+			{#if loadingDevices}
+				<span class="form-hint">Loading devices...</span>
+			{:else if availableDevices.length === 0}
+				<div class="warning-message">
+					<p>No paired devices available. Please <a href="/devices">pair a device</a> before creating a batch.</p>
+				</div>
+			{:else}
+				<select id="device" class="form-select" bind:value={deviceId}>
+					<option value={null}>No device assigned</option>
+					{#each availableDevices as device}
+						<option value={device.id}>
+							{device.color} Tilt
+							{#if device.beer_name && device.beer_name !== 'Untitled'}
+								- {device.beer_name}
+							{/if}
+						</option>
+					{/each}
+				</select>
+				<span class="form-hint">Link a Tilt to track live gravity and temperature</span>
+			{/if}
 		</div>
 
 		<!-- Brew Date -->
@@ -598,6 +618,29 @@
 		color: var(--text-secondary);
 		font-family: var(--font-mono);
 		margin: 0;
+	}
+
+	.warning-message {
+		padding: 0.75rem 1rem;
+		background: rgba(245, 158, 11, 0.1);
+		border: 1px solid rgba(245, 158, 11, 0.3);
+		border-radius: 0.5rem;
+	}
+
+	.warning-message p {
+		margin: 0;
+		font-size: 0.875rem;
+		color: var(--warning);
+	}
+
+	.warning-message a {
+		color: var(--accent);
+		font-weight: 500;
+		text-decoration: underline;
+	}
+
+	.warning-message a:hover {
+		color: var(--accent-hover);
 	}
 
 	@media (max-width: 480px) {

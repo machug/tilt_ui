@@ -35,7 +35,7 @@ cleanup_service: Optional[CleanupService] = None
 async def handle_tilt_reading(reading: TiltReading):
     """Process a new Tilt reading: update DB and broadcast to WebSocket clients."""
     async with async_session_factory() as session:
-        # Upsert Tilt record
+        # Upsert Tilt record (always track detected devices)
         tilt = await session.get(Tilt, reading.id)
         if not tilt:
             tilt = Tilt(
@@ -43,6 +43,7 @@ async def handle_tilt_reading(reading: TiltReading):
                 color=reading.color,
                 mac=reading.mac,
                 beer_name="Untitled",
+                paired=False,  # New devices start unpaired
             )
             session.add(tilt)
 
@@ -54,27 +55,30 @@ async def handle_tilt_reading(reading: TiltReading):
             session, reading.id, reading.sg, reading.temp_f
         )
 
-        # Device ID for Tilts is the same as tilt_id (e.g., "tilt-red")
-        device_id = reading.id
+        # Only store reading if device is paired
+        if tilt.paired:
+            # Device ID for Tilts is the same as tilt_id (e.g., "tilt-red")
+            device_id = reading.id
 
-        # Link to active batch if one exists for this device
-        batch_id = await link_reading_to_batch(session, device_id)
+            # Link to active batch if one exists for this device
+            batch_id = await link_reading_to_batch(session, device_id)
 
-        # Store reading in DB
-        db_reading = Reading(
-            tilt_id=reading.id,
-            device_id=device_id,
-            batch_id=batch_id,
-            sg_raw=reading.sg,
-            sg_calibrated=sg_calibrated,
-            temp_raw=reading.temp_f,
-            temp_calibrated=temp_calibrated,
-            rssi=reading.rssi,
-        )
-        session.add(db_reading)
+            # Store reading in DB
+            db_reading = Reading(
+                tilt_id=reading.id,
+                device_id=device_id,
+                batch_id=batch_id,
+                sg_raw=reading.sg,
+                sg_calibrated=sg_calibrated,
+                temp_raw=reading.temp_f,
+                temp_calibrated=temp_calibrated,
+                rssi=reading.rssi,
+            )
+            session.add(db_reading)
+
         await session.commit()
 
-        # Build reading data for WebSocket broadcast
+        # Build reading data for WebSocket broadcast (always broadcast)
         reading_data = {
             "id": reading.id,
             "color": reading.color,
@@ -86,6 +90,7 @@ async def handle_tilt_reading(reading: TiltReading):
             "temp_raw": reading.temp_f,
             "rssi": reading.rssi,
             "last_seen": datetime.now(timezone.utc).isoformat(),
+            "paired": tilt.paired,  # Include pairing status
         }
 
         # Update in-memory cache
@@ -294,6 +299,12 @@ async def serve_calibration():
 async def serve_system():
     """Serve the system page."""
     return FileResponse(static_dir / "system.html")
+
+
+@app.get("/devices", response_class=FileResponse)
+async def serve_devices():
+    """Serve the devices page."""
+    return FileResponse(static_dir / "devices.html")
 
 
 @app.get("/batches", response_class=FileResponse)

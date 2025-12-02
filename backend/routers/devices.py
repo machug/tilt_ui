@@ -119,6 +119,8 @@ class DeviceResponse(BaseModel):
     color: Optional[str]
     mac: Optional[str]
     created_at: datetime
+    paired: bool
+    paired_at: Optional[datetime]
 
     @classmethod
     def from_orm_with_calibration(cls, device: Device) -> "DeviceResponse":
@@ -141,6 +143,8 @@ class DeviceResponse(BaseModel):
             color=device.color,
             mac=device.mac,
             created_at=device.created_at,
+            paired=device.paired,
+            paired_at=device.paired_at,
         )
 
 
@@ -241,13 +245,17 @@ class CalibrationTestResponse(BaseModel):
 @router.get("", response_model=list[DeviceResponse])
 async def list_devices(
     device_type: Optional[str] = Query(None, description="Filter by device type"),
+    paired_only: bool = Query(False, description="Only return paired devices"),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all devices, optionally filtered by device type."""
+    """List all devices, optionally filtered by device type and pairing status."""
     query = select(Device).order_by(Device.created_at.desc())
 
     if device_type:
         query = query.where(Device.device_type == device_type)
+
+    if paired_only:
+        query = query.where(Device.paired == True)
 
     result = await db.execute(query)
     devices = result.scalars().all()

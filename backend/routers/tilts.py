@@ -187,6 +187,47 @@ async def get_readings(
         return result.scalars().all()
 
 
+# Pairing endpoints
+@router.post("/{tilt_id}/pair", response_model=TiltResponse)
+async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
+    """Pair a Tilt device to enable reading storage."""
+    tilt = await db.get(Tilt, tilt_id)
+    if not tilt:
+        raise HTTPException(status_code=404, detail="Tilt not found")
+
+    tilt.paired = True
+    tilt.paired_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(tilt)
+
+    # Update in-memory cache
+    if tilt_id in latest_readings:
+        latest_readings[tilt_id]["paired"] = True
+        await manager.broadcast(latest_readings[tilt_id])
+
+    return tilt
+
+
+@router.post("/{tilt_id}/unpair", response_model=TiltResponse)
+async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
+    """Unpair a Tilt device to stop reading storage."""
+    tilt = await db.get(Tilt, tilt_id)
+    if not tilt:
+        raise HTTPException(status_code=404, detail="Tilt not found")
+
+    tilt.paired = False
+    tilt.paired_at = None
+    await db.commit()
+    await db.refresh(tilt)
+
+    # Update in-memory cache
+    if tilt_id in latest_readings:
+        latest_readings[tilt_id]["paired"] = False
+        await manager.broadcast(latest_readings[tilt_id])
+
+    return tilt
+
+
 # Calibration endpoints
 @router.get("/{tilt_id}/calibration", response_model=list[CalibrationPointResponse])
 async def get_calibration(tilt_id: str, db: AsyncSession = Depends(get_db)):

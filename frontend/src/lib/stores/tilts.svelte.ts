@@ -11,6 +11,7 @@ export interface TiltReading {
 	temp_raw: number;
 	rssi: number;
 	last_seen: string;
+	paired: boolean;
 }
 
 export interface AmbientReading {

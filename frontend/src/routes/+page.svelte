@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { weatherState } from '$lib/stores/weather.svelte';
-	import TiltCard from '$lib/components/TiltCard.svelte';
+	import FermentationCard from '$lib/components/FermentationCard.svelte';
 
 	let alertsDismissed = $state(false);
 	let alertsCollapsed = $state(false);
@@ -108,7 +108,7 @@
 {:else}
 	<div class="tilt-grid" class:single-tilt={tiltsList.length === 1}>
 		{#each tiltsList as tilt (tilt.id)}
-			<TiltCard
+			<FermentationCard
 				{tilt}
 				expanded={expandedTiltId === tilt.id}
 				wide={tiltsList.length === 1}

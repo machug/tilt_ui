@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { configState, formatTemp, getTempUnit, formatGravity, getGravityUnit } from '$lib/stores/config.svelte';
 	import { updateBatch, type BatchResponse, type BatchProgressResponse } from '$lib/api';
 	import FermentationChart from './FermentationChart.svelte';
@@ -281,20 +280,7 @@
 
 		<!-- Footer -->
 		<div class="flex justify-between items-center pt-3 border-t border-[var(--bg-hover)]">
-			<div class="flex items-center gap-3">
-				<span class="text-[11px] text-[var(--text-muted)]">Updated {lastSeenText}</span>
-				<button
-					type="button"
-					class="batch-link"
-					onclick={() => goto(`/batches/${batch.id}`)}
-					title="View batch details"
-				>
-					Batch #{batch.batch_number ?? batch.id}
-					<svg class="batch-link-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-					</svg>
-				</button>
-			</div>
+			<span class="text-[11px] text-[var(--text-muted)]">Updated {lastSeenText}</span>
 			<div class="flex items-center gap-2">
 				{#if onToggleExpand}
 					<button
@@ -433,33 +419,6 @@
 
 	.beer-name-input:disabled {
 		opacity: 0.6;
-	}
-
-	/* Batch link */
-	.batch-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: var(--text-secondary);
-		background: var(--bg-elevated);
-		border: 1px solid var(--border-subtle);
-		padding: 0.25rem 0.5rem;
-		border-radius: 9999px;
-		cursor: pointer;
-		transition: all var(--transition);
-	}
-
-	.batch-link:hover {
-		color: var(--accent);
-		border-color: var(--accent-muted);
-		background: var(--accent-muted);
-	}
-
-	.batch-link-icon {
-		width: 0.75rem;
-		height: 0.75rem;
 	}
 
 	.pairing-badge {

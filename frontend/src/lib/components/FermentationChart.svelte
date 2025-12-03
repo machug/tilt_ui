@@ -4,6 +4,7 @@
 	import {
 		fetchReadings,
 		fetchAmbientHistory,
+		fetchBatch,
 		TIME_RANGES,
 		type HistoricalReading,
 		type AmbientHistoricalReading
@@ -30,13 +31,12 @@
 	let refreshMinutes = $state<number>(3);
 
 	interface Props {
-		tiltId: string;
-		tiltColor: string;
+		batchId: number;
+		deviceColor?: string;
 		originalGravity?: number | null;
-		onOgChange?: (og: number | null) => void;
 	}
 
-	let { tiltId, tiltColor, originalGravity = null, onOgChange }: Props = $props();
+	let { batchId, deviceColor = 'BLACK', originalGravity = null }: Props = $props();
 
 	// Reactive check for display units
 	let useCelsius = $derived(configState.config.temp_units === 'C');
@@ -50,6 +50,7 @@
 	let readings = $state<HistoricalReading[]>([]);
 	let ambientReadings = $state<AmbientHistoricalReading[]>([]);
 	let currentTrend = $state<TrendResult | null>(null);
+	let deviceId = $state<string | null>(null); // Store device_id from batch
 
 	// Color mapping for tilt accent in chart
 	const tiltColorMap: Record<string, string> = {
@@ -198,7 +199,7 @@
 
 	function getChartOptions(width: number, celsius: boolean, tz: string): uPlot.Options {
 		const sgColor = SG_COLOR;
-		const tempColor = tiltColorMap[tiltColor] || TEXT_SECONDARY;
+		const tempColor = tiltColorMap[deviceColor] || TEXT_SECONDARY;
 
 		return {
 			width,
@@ -519,14 +520,28 @@ async function loadData(userTriggered = false) {
 	error = null;
 
 	try {
-		// Fetch tilt readings and ambient history in parallel
-		const [tiltData, ambientData] = await Promise.all([
-			fetchReadings(tiltId, selectedRange),
-			fetchAmbientHistory(selectedRange).catch(() => []) // Don't fail if ambient unavailable
-		]);
-		readings = tiltData;
-		ambientReadings = ambientData;
-		updateChart();
+		// Fetch batch to get device_id if we don't have it yet
+		if (!deviceId) {
+			const batch = await fetchBatch(batchId);
+			deviceId = batch.device_id ?? null;
+		}
+
+		// Only fetch readings if we have a device_id
+		if (deviceId) {
+			// Fetch device readings and ambient history in parallel
+			const [deviceData, ambientData] = await Promise.all([
+				fetchReadings(deviceId, selectedRange),
+				fetchAmbientHistory(selectedRange).catch(() => []) // Don't fail if ambient unavailable
+			]);
+			readings = deviceData;
+			ambientReadings = ambientData;
+			updateChart();
+		} else {
+			// No device assigned to batch
+			readings = [];
+			ambientReadings = [];
+			error = 'No device assigned to this batch';
+		}
 	} catch (e) {
 		error = e instanceof Error ? e.message : 'Failed to load data';
 	} finally {
@@ -686,7 +701,7 @@ onMount(async () => {
 				<span class="legend-item">
 					<span
 						class="legend-line"
-						style="background: {tiltColorMap[tiltColor] || 'var(--text-secondary)'};"
+						style="background: {tiltColorMap[deviceColor] || 'var(--text-secondary)'};"
 					></span>
 					<span>Wort</span>
 				</span>
@@ -733,7 +748,7 @@ onMount(async () => {
 		<FermentationStats
 			{readings}
 			{originalGravity}
-			onOgChange={onOgChange ?? (() => {})}
+			onOgChange={() => {}}
 			trend={currentTrend ? { predictedFg: currentTrend.predictedFg, daysToFg: currentTrend.daysToFg, r2: currentTrend.r2 } : null}
 		/>
 	{/if}

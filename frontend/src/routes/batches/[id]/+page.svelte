@@ -652,6 +652,7 @@
 		display: grid;
 		grid-template-columns: 2fr 1fr;
 		gap: 1.5rem;
+		align-items: start;
 	}
 
 	@media (max-width: 900px) {

@@ -56,6 +56,38 @@ async def list_batches(
     return result.scalars().all()
 
 
+@router.get("/active", response_model=list[BatchResponse])
+async def list_active_batches(db: AsyncSession = Depends(get_db)):
+    """Active batches: planning or fermenting status, not deleted."""
+    query = (
+        select(Batch)
+        .options(selectinload(Batch.recipe).selectinload(Recipe.style))
+        .where(
+            Batch.deleted_at.is_(None),
+            Batch.status.in_(["planning", "fermenting"])
+        )
+        .order_by(Batch.created_at.desc())
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/completed", response_model=list[BatchResponse])
+async def list_completed_batches(db: AsyncSession = Depends(get_db)):
+    """Historical batches: completed or conditioning, not deleted."""
+    query = (
+        select(Batch)
+        .options(selectinload(Batch.recipe).selectinload(Recipe.style))
+        .where(
+            Batch.deleted_at.is_(None),
+            Batch.status.in_(["completed", "conditioning"])
+        )
+        .order_by(Batch.updated_at.desc())
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
 @router.get("/{batch_id}", response_model=BatchResponse)
 async def get_batch(batch_id: int, db: AsyncSession = Depends(get_db)):
     """Get a specific batch by ID."""

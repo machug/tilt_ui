@@ -105,7 +105,10 @@ async def get_readings(
     if not tilt:
         raise HTTPException(status_code=404, detail="Tilt not found")
 
-    query = select(Reading).where(Reading.tilt_id == tilt_id)
+    query = select(Reading).where(
+        Reading.tilt_id == tilt_id,
+        Reading.status == "valid"  # Filter out outliers
+    )
 
     # Apply time filters
     if hours:
@@ -117,7 +120,10 @@ async def get_readings(
 
     # Get total count in the time range to determine downsampling
     from sqlalchemy import func
-    count_query = select(func.count()).select_from(Reading).where(Reading.tilt_id == tilt_id)
+    count_query = select(func.count()).select_from(Reading).where(
+        Reading.tilt_id == tilt_id,
+        Reading.status == "valid"  # Only count valid readings
+    )
     if start:
         count_query = count_query.where(Reading.timestamp >= start)
     if end:
@@ -133,7 +139,7 @@ async def get_readings(
         step = total_count // limit
 
         # Build WHERE clause for raw SQL
-        where_parts = ["tilt_id = :tilt_id", "rowid % :step = 0"]
+        where_parts = ["tilt_id = :tilt_id", "rowid % :step = 0", "status = 'valid'"]
         params = {"tilt_id": tilt_id, "step": step, "limit": limit}
 
         if start:

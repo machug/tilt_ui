@@ -55,6 +55,21 @@ async def handle_tilt_reading(reading: TiltReading):
             session, reading.id, reading.sg, reading.temp_f
         )
 
+        # Validate reading for outliers (physical impossibility check)
+        # Valid SG range: 0.500-1.200 (beer is typically 1.000-1.120)
+        # Valid temp range: 32-212°F (freezing to boiling)
+        status = "valid"
+        if not (0.500 <= sg_calibrated <= 1.200):
+            status = "invalid"
+            logging.warning(
+                f"Outlier SG detected: {sg_calibrated:.4f} (valid: 0.500-1.200) for device {reading.id}"
+            )
+        elif not (32.0 <= temp_calibrated <= 212.0):
+            status = "invalid"
+            logging.warning(
+                f"Outlier temperature detected: {temp_calibrated:.1f}°F (valid: 32-212) for device {reading.id}"
+            )
+
         # Only store reading if device is paired
         if tilt.paired:
             # Device ID for Tilts is the same as tilt_id (e.g., "tilt-red")
@@ -73,6 +88,7 @@ async def handle_tilt_reading(reading: TiltReading):
                 temp_raw=reading.temp_f,
                 temp_calibrated=temp_calibrated,
                 rssi=reading.rssi,
+                status=status,  # Mark as valid or invalid
             )
             session.add(db_reading)
 

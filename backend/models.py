@@ -350,10 +350,18 @@ class Batch(Base):
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+    # Soft delete timestamp
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Relationships
     recipe: Mapped[Optional["Recipe"]] = relationship(back_populates="batches")
     device: Mapped[Optional["Device"]] = relationship()
     readings: Mapped[list["Reading"]] = relationship(back_populates="batch")
+
+    @property
+    def is_deleted(self) -> bool:
+        """Check if batch is soft-deleted."""
+        return self.deleted_at is not None
 
 
 class RecipeFermentable(Base):

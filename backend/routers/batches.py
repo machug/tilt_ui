@@ -19,7 +19,6 @@ from ..models import (
     Recipe,
 )
 from ..state import latest_readings
-from ..utils.temperature import fahrenheit_to_celsius
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
 
@@ -273,15 +272,15 @@ async def get_batch_progress(batch_id: int, db: AsyncSession = Depends(get_db)):
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
-    # Get current SG from latest reading
+    # Get current SG and temperature from latest reading
+    # Temperature is in Fahrenheit (from Tilt device)
+    # Frontend will convert based on user preference
     current_sg = None
     current_temp = None
     if batch.device_id and batch.device_id in latest_readings:
         reading = latest_readings[batch.device_id]
         current_sg = reading.get("sg")
-        # Convert temperature from Fahrenheit to Celsius for API response
-        temp_f = reading.get("temp")
-        current_temp = fahrenheit_to_celsius(temp_f) if temp_f is not None else None
+        current_temp = reading.get("temp")
 
     # Calculate targets from recipe
     targets = {}

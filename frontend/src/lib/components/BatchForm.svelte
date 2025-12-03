@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus, HeaterEntity } from '$lib/api';
 	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
-	import { configState, getTempUnit } from '$lib/stores/config.svelte';
+	import { configState, getTempUnit, fahrenheitToCelsius, celsiusToFahrenheit } from '$lib/stores/config.svelte';
 	import { fetchAllDevices, type DeviceResponse } from '$lib/api/devices';
 	import RecipeSelector from './RecipeSelector.svelte';
 
@@ -26,9 +26,31 @@
 	let notes = $state(batch?.notes || '');
 
 	// Temperature control fields
+	// Backend stores temps in F, convert for display based on user preference
 	let heaterEntityId = $state(batch?.heater_entity_id || '');
-	let tempTarget = $state(batch?.temp_target?.toString() || '');
-	let tempHysteresis = $state(batch?.temp_hysteresis?.toString() || '');
+
+	// Helper to convert backend F value to display value (F or C based on preference)
+	function tempToDisplay(tempF: number | null | undefined): string {
+		if (tempF === null || tempF === undefined) return '';
+		if (configState.config.temp_units === 'C') {
+			return fahrenheitToCelsius(tempF).toFixed(1);
+		}
+		return tempF.toFixed(1);
+	}
+
+	// Helper to convert display value back to F for backend
+	function displayToTempF(displayValue: string): number | undefined {
+		if (!displayValue) return undefined;
+		const num = parseFloat(displayValue);
+		if (isNaN(num)) return undefined;
+		if (configState.config.temp_units === 'C') {
+			return celsiusToFahrenheit(num);
+		}
+		return num;
+	}
+
+	let tempTarget = $state(tempToDisplay(batch?.temp_target));
+	let tempHysteresis = $state(tempToDisplay(batch?.temp_hysteresis));
 
 	let recipes = $state<RecipeResponse[]>([]);
 	let heaterEntities = $state<HeaterEntity[]>([]);
@@ -120,10 +142,10 @@
 				brew_date: brewDate ? new Date(brewDate).toISOString() : undefined,
 				measured_og: measuredOg ? parseFloat(measuredOg) : undefined,
 				notes: notes || undefined,
-				// Temperature control
+				// Temperature control - convert display values back to F for backend
 				heater_entity_id: heaterEntityId || undefined,
-				temp_target: tempTarget ? parseFloat(tempTarget) : undefined,
-				temp_hysteresis: tempHysteresis ? parseFloat(tempHysteresis) : undefined
+				temp_target: displayToTempF(tempTarget),
+				temp_hysteresis: displayToTempF(tempHysteresis)
 			};
 
 			// Set recipe_id for both create and update

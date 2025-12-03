@@ -40,6 +40,10 @@ async def init_db():
     1. Run migrations first (for existing DBs with data)
     2. Then create_all (for new tables/columns in fresh DBs)
     3. Then data migrations (copy tilts to devices)
+
+    IMPORTANT: This function is not thread-safe. Run with a single worker
+    during startup to avoid migration race conditions. After initial startup,
+    multiple workers can safely access the database for read/write operations.
     """
     async with engine.begin() as conn:
         # Step 1: Schema migrations for existing DBs

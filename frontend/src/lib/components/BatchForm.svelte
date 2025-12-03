@@ -38,6 +38,16 @@
 		return tempF.toFixed(1);
 	}
 
+	// Helper to convert temperature DELTA (difference) from F to display unit
+	// For deltas: ΔC = ΔF × 5/9 (no offset subtraction)
+	function tempDeltaToDisplay(deltaF: number | null | undefined): string {
+		if (deltaF === null || deltaF === undefined) return '';
+		if (configState.config.temp_units === 'C') {
+			return (deltaF * 5 / 9).toFixed(1);
+		}
+		return deltaF.toFixed(1);
+	}
+
 	// Helper to convert display value back to F for backend
 	function displayToTempF(displayValue: string): number | undefined {
 		if (!displayValue) return undefined;
@@ -49,8 +59,20 @@
 		return num;
 	}
 
+	// Helper to convert display delta back to F delta for backend
+	// For deltas: ΔF = ΔC × 9/5 (no offset addition)
+	function displayToTempDeltaF(displayValue: string): number | undefined {
+		if (!displayValue) return undefined;
+		const num = parseFloat(displayValue);
+		if (isNaN(num)) return undefined;
+		if (configState.config.temp_units === 'C') {
+			return num * 9 / 5;
+		}
+		return num;
+	}
+
 	let tempTarget = $state(tempToDisplay(batch?.temp_target));
-	let tempHysteresis = $state(tempToDisplay(batch?.temp_hysteresis));
+	let tempHysteresis = $state(tempDeltaToDisplay(batch?.temp_hysteresis));
 
 	let recipes = $state<RecipeResponse[]>([]);
 	let heaterEntities = $state<HeaterEntity[]>([]);
@@ -145,7 +167,7 @@
 				// Temperature control - convert display values back to F for backend
 				heater_entity_id: heaterEntityId || undefined,
 				temp_target: displayToTempF(tempTarget),
-				temp_hysteresis: displayToTempF(tempHysteresis)
+				temp_hysteresis: displayToTempDeltaF(tempHysteresis)
 			};
 
 			// Set recipe_id for both create and update

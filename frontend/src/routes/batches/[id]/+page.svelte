@@ -7,6 +7,12 @@
 	import { formatGravity, getGravityUnit, formatTemp, getTempUnit, configState } from '$lib/stores/config.svelte';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import BatchForm from '$lib/components/BatchForm.svelte';
+	import BatchLiveReadingsCard from '$lib/components/batch/BatchLiveReadingsCard.svelte';
+	import BatchFermentationCard from '$lib/components/batch/BatchFermentationCard.svelte';
+	import BatchTimelineCard from '$lib/components/batch/BatchTimelineCard.svelte';
+	import BatchDeviceCard from '$lib/components/batch/BatchDeviceCard.svelte';
+	import BatchRecipeTargetsCard from '$lib/components/batch/BatchRecipeTargetsCard.svelte';
+	import BatchNotesCard from '$lib/components/batch/BatchNotesCard.svelte';
 
 	// WebSocket for live heater state updates
 	let controlWs: WebSocket | null = null;
@@ -22,7 +28,7 @@
 	let statusUpdating = $state(false);
 	let heaterLoading = $state(false);
 
-	let batchId = $derived(parseInt($page.params.id));
+	let batchId = $derived(parseInt($page.params.id ?? '0'));
 
 	// Status configuration
 	const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -53,7 +59,7 @@
 		if (!batch?.device_id) return null;
 		// Extract color from device_id - handle both "tilt-red" and "RED" formats
 		const colorMatch = batch.device_id.match(/^(?:tilt-)?(\w+)$/i);
-		if (!colorMatch) return null;
+		if (!colorMatch?.[1]) return null;
 		const targetColor = colorMatch[1].toUpperCase();
 		// Find tilt with matching color
 		for (const tilt of tiltsState.tilts.values()) {
@@ -310,7 +316,7 @@
 					</svg>
 					Edit
 				</button>
-				<button type="button" class="delete-btn" onclick={handleDelete}>
+				<button type="button" class="delete-btn" onclick={handleDelete} aria-label="Delete batch">
 					<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 					</svg>
@@ -320,180 +326,43 @@
 
 		<!-- Main content grid -->
 		<div class="content-grid">
-			<!-- Stats cards -->
+			<!-- Left column -->
 			<div class="stats-section">
-				<!-- Current/Live reading -->
+				<!-- Live Readings Card (only if device is linked and has live data) -->
 				{#if liveReading || progress?.measured?.current_sg != null}
-					<div class="stat-card live">
-						<div class="stat-header">
-							<span class="stat-title">Current</span>
-							{#if liveReading}
-								<span class="live-badge">
-									<span class="live-dot"></span>
-									Live
-								</span>
-							{/if}
-						</div>
-						<div class="stat-row">
-							<div class="stat-item">
-								<div class="stat-value">
-									{formatSG(liveReading?.sg ?? progress?.measured?.current_sg)}
-								</div>
-								<div class="stat-label">{gravityUnit}</div>
-							</div>
-							{#if liveReading?.temp != null || progress?.temperature?.current != null}
-								<div class="stat-item">
-									<div class="stat-value temp">
-										{formatTempValue(liveReading?.temp ?? progress?.temperature?.current)}
-									</div>
-									<div class="stat-label">{tempUnit}</div>
-								</div>
-							{/if}
-						</div>
-					</div>
+					<BatchLiveReadingsCard
+						{liveReading}
+						currentSg={progress?.measured?.current_sg}
+						currentTemp={progress?.temperature?.current}
+					/>
 				{/if}
 
-				<!-- Progress -->
-				{#if progress?.progress?.percent_complete != null}
-					<div class="stat-card">
-						<div class="stat-header">
-							<span class="stat-title">Progress</span>
-						</div>
-						<div class="progress-display">
-							<div class="progress-value">{progress.progress.percent_complete.toFixed(0)}%</div>
-							<div class="progress-bar-container">
-								<div
-									class="progress-bar"
-									style="width: {progress.progress.percent_complete}%"
-								></div>
-							</div>
-							{#if progress.progress.sg_remaining != null}
-								<div class="progress-remaining">
-									{progress.progress.sg_remaining.toFixed(3)} SG remaining
-								</div>
-							{/if}
-						</div>
-					</div>
-				{/if}
+				<!-- Fermentation Card -->
+				<BatchFermentationCard
+					{batch}
+					currentSg={liveReading?.sg ?? progress?.measured?.current_sg}
+					{progress}
+				/>
 
-				<!-- Measurements -->
-				<div class="stat-card">
-					<div class="stat-header">
-						<span class="stat-title">Measurements</span>
-					</div>
-					<div class="measurements-grid">
-						<div class="measurement">
-							<span class="measurement-label">OG</span>
-							<span class="measurement-value">{formatSG(batch.measured_og)}</span>
-						</div>
-						<div class="measurement">
-							<span class="measurement-label">FG</span>
-							<span class="measurement-value">{formatSG(batch.measured_fg)}</span>
-						</div>
-						<div class="measurement">
-							<span class="measurement-label">ABV</span>
-							<span class="measurement-value">
-								{batch.measured_abv != null ? `${batch.measured_abv.toFixed(1)}%` : '--'}
-							</span>
-						</div>
-						<div class="measurement">
-							<span class="measurement-label">Atten</span>
-							<span class="measurement-value">
-								{batch.measured_attenuation != null ? `${batch.measured_attenuation.toFixed(0)}%` : '--'}
-							</span>
-						</div>
-					</div>
-				</div>
-
-				<!-- Targets (from recipe) -->
+				<!-- Recipe Targets Card (only if recipe exists) -->
 				{#if batch.recipe}
-					<div class="stat-card">
-						<div class="stat-header">
-							<span class="stat-title">Recipe Targets</span>
-						</div>
-						<div class="measurements-grid">
-							<div class="measurement">
-								<span class="measurement-label">OG</span>
-								<span class="measurement-value target">{formatSG(batch.recipe.og_target)}</span>
-							</div>
-							<div class="measurement">
-								<span class="measurement-label">FG</span>
-								<span class="measurement-value target">{formatSG(batch.recipe.fg_target)}</span>
-							</div>
-							<div class="measurement">
-								<span class="measurement-label">ABV</span>
-								<span class="measurement-value target">
-									{batch.recipe.abv_target != null ? `${batch.recipe.abv_target.toFixed(1)}%` : '--'}
-								</span>
-							</div>
-							{#if batch.recipe.yeast_name}
-								<div class="measurement wide">
-									<span class="measurement-label">Yeast</span>
-									<span class="measurement-value target">{batch.recipe.yeast_name}</span>
-								</div>
-							{/if}
-						</div>
-					</div>
+					<BatchRecipeTargetsCard recipe={batch.recipe} />
 				{/if}
 			</div>
 
-			<!-- Timeline & Device -->
+			<!-- Right column -->
 			<div class="info-section">
-				<!-- Timeline -->
-				<div class="info-card">
-					<h3 class="info-title">Timeline</h3>
-					<div class="timeline">
-						<div class="timeline-item">
-							<span class="timeline-label">Brew Date</span>
-							<span class="timeline-value">{formatDate(batch.brew_date)}</span>
-						</div>
-						<div class="timeline-item">
-							<span class="timeline-label">Started</span>
-							<span class="timeline-value">{formatDateTime(batch.start_time)}</span>
-						</div>
-						<div class="timeline-item">
-							<span class="timeline-label">Ended</span>
-							<span class="timeline-value">{formatDateTime(batch.end_time)}</span>
-						</div>
-						<div class="timeline-item">
-							<span class="timeline-label">Created</span>
-							<span class="timeline-value">{formatDateTime(batch.created_at)}</span>
-						</div>
-					</div>
-				</div>
+				<!-- Timeline Card -->
+				<BatchTimelineCard {batch} />
 
-				<!-- Device -->
-				<div class="info-card">
-					<h3 class="info-title">Tracking Device</h3>
-					{#if batch.device_id}
-						<div class="device-info">
-							{#if liveReading}
-								<div class="device-status online">
-									<span class="device-dot"></span>
-									{liveReading.color} Tilt - Connected
-								</div>
-								<div class="device-last-seen">
-									Updated just now
-								</div>
-							{:else}
-								<div class="device-status offline">
-									<span class="device-dot"></span>
-									Device: {batch.device_id}
-								</div>
-								<div class="device-last-seen">Not receiving data</div>
-							{/if}
-						</div>
-					{:else}
-						<div class="no-device">
-							<span>No device assigned</span>
-							<button type="button" class="link-btn" onclick={() => (isEditing = true)}>
-								Link a device
-							</button>
-						</div>
-					{/if}
-				</div>
+				<!-- Device Card -->
+				<BatchDeviceCard
+					{batch}
+					{liveReading}
+					onEdit={() => (isEditing = true)}
+				/>
 
-				<!-- Heater Control -->
+				<!-- Heater Control Card (existing) -->
 				{#if hasHeaterControl && batch.status === 'fermenting'}
 					<div class="info-card heater-card" class:heater-on={controlStatus?.heater_state === 'on'}>
 						<h3 class="info-title">Temperature Control</h3>
@@ -568,12 +437,9 @@
 					</div>
 				{/if}
 
-				<!-- Notes -->
+				<!-- Notes Card (only if notes exist) -->
 				{#if batch.notes}
-					<div class="info-card">
-						<h3 class="info-title">Notes</h3>
-						<p class="notes-content">{batch.notes}</p>
-					</div>
+					<BatchNotesCard notes={batch.notes} />
 				{/if}
 			</div>
 		</div>
@@ -801,152 +667,6 @@
 		gap: 1rem;
 	}
 
-	.stat-card {
-		background: var(--bg-surface);
-		border: 1px solid var(--border-subtle);
-		border-radius: 0.75rem;
-		padding: 1.25rem;
-	}
-
-	.stat-card.live {
-		border-color: rgba(245, 158, 11, 0.3);
-	}
-
-	.stat-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1rem;
-	}
-
-	.stat-title {
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.live-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: #f59e0b;
-		text-transform: uppercase;
-	}
-
-	.live-dot {
-		width: 6px;
-		height: 6px;
-		background: #f59e0b;
-		border-radius: 50%;
-		animation: pulse 2s ease-in-out infinite;
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.4; }
-	}
-
-	.stat-row {
-		display: flex;
-		gap: 2rem;
-	}
-
-	.stat-item {
-		text-align: center;
-	}
-
-	.stat-value {
-		font-family: var(--font-mono);
-		font-size: 2.5rem;
-		font-weight: 500;
-		color: var(--text-primary);
-		line-height: 1;
-	}
-
-	.stat-value.temp {
-		color: var(--positive);
-	}
-
-	.stat-label {
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		margin-top: 0.25rem;
-	}
-
-	/* Progress */
-	.progress-display {
-		text-align: center;
-	}
-
-	.progress-value {
-		font-family: var(--font-mono);
-		font-size: 2rem;
-		font-weight: 500;
-		color: var(--positive);
-		margin-bottom: 0.75rem;
-	}
-
-	.progress-bar-container {
-		height: 8px;
-		background: var(--bg-elevated);
-		border-radius: 4px;
-		overflow: hidden;
-		margin-bottom: 0.5rem;
-	}
-
-	.progress-bar {
-		height: 100%;
-		background: linear-gradient(90deg, #f59e0b, #84cc16);
-		border-radius: 4px;
-		transition: width 0.5s ease-out;
-	}
-
-	.progress-remaining {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-	}
-
-	/* Measurements */
-	.measurements-grid {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 0.75rem;
-	}
-
-	.measurement {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.measurement.wide {
-		grid-column: span 2;
-	}
-
-	.measurement-label {
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: var(--text-muted);
-		text-transform: uppercase;
-	}
-
-	.measurement-value {
-		font-family: var(--font-mono);
-		font-size: 1rem;
-		font-weight: 500;
-		color: var(--text-primary);
-	}
-
-	.measurement-value.target {
-		color: var(--text-secondary);
-	}
-
 	/* Info section */
 	.info-section {
 		display: flex;
@@ -970,95 +690,13 @@
 		margin: 0 0 1rem 0;
 	}
 
-	.timeline {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.timeline-item {
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.timeline-label {
-		font-size: 0.8125rem;
-		color: var(--text-muted);
-	}
-
-	.timeline-value {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--text-secondary);
-	}
-
-	/* Device */
-	.device-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.device-status {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-	}
-
-	.device-status.online {
-		color: var(--positive);
-	}
-
-	.device-status.offline {
-		color: var(--text-muted);
-	}
-
-	.device-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: currentColor;
-	}
-
-	.device-last-seen {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		margin-left: 1rem;
-	}
-
+	/* Keep .no-device for heater card compatibility */
 	.no-device {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 		font-size: 0.875rem;
 		color: var(--text-muted);
-	}
-
-	.link-btn {
-		align-self: flex-start;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--accent);
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-	}
-
-	.link-btn:hover {
-		text-decoration: underline;
-	}
-
-	/* Notes */
-	.notes-content {
-		font-size: 0.875rem;
-		color: var(--text-secondary);
-		line-height: 1.6;
-		margin: 0;
-		white-space: pre-wrap;
 	}
 
 	.hint {
@@ -1256,18 +894,6 @@
 		.header-actions {
 			width: 100%;
 			justify-content: flex-start;
-		}
-
-		.measurements-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-
-		.stat-row {
-			gap: 1.5rem;
-		}
-
-		.stat-value {
-			font-size: 2rem;
 		}
 	}
 </style>

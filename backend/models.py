@@ -275,6 +275,7 @@ class Recipe(Base):
     fermentables: Mapped[list["RecipeFermentable"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
     hops: Mapped[list["RecipeHop"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
     yeasts: Mapped[list["RecipeYeast"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
+    miscs: Mapped[list["RecipeMisc"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
 
 
 class Batch(Base):
@@ -418,6 +419,25 @@ class RecipeYeast(Base):
 
     # Relationship
     recipe: Mapped["Recipe"] = relationship(back_populates="yeasts")
+
+
+class RecipeMisc(Base):
+    """Misc ingredients (spices, finings, water agents, etc)."""
+    __tablename__ = "recipe_miscs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)  # Spice, Fining, Water Agent, Herb, Flavor, Other
+    use: Mapped[str] = mapped_column(String(20), nullable=False)  # Boil, Mash, Primary, Secondary, Bottling
+    time_min: Mapped[Optional[float]] = mapped_column()  # Minutes
+    amount_kg: Mapped[Optional[float]] = mapped_column()  # Kg or L (check amount_is_weight)
+    amount_is_weight: Mapped[Optional[bool]] = mapped_column(default=True)
+    use_for: Mapped[Optional[str]] = mapped_column(Text)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    recipe: Mapped["Recipe"] = relationship(back_populates="miscs")
 
 
 # Pydantic Schemas

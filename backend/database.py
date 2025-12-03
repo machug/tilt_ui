@@ -55,6 +55,7 @@ async def init_db():
         await conn.run_sync(_migrate_create_recipe_fermentables_table)  # Create recipe_fermentables table
         await conn.run_sync(_migrate_create_recipe_hops_table)  # Create recipe_hops table
         await conn.run_sync(_migrate_create_recipe_yeasts_table)  # Create recipe_yeasts table
+        await conn.run_sync(_migrate_create_recipe_miscs_table)  # Create recipe_miscs table
         await conn.run_sync(_migrate_add_batch_id_to_readings)  # Add this line (after batches table exists)
         await conn.run_sync(_migrate_add_batch_heater_columns)  # Add heater control columns to batches
         await conn.run_sync(_migrate_add_batch_id_to_control_events)  # Add batch_id to control_events
@@ -574,6 +575,33 @@ def _migrate_create_recipe_yeasts_table(conn):
 
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_yeasts_recipe ON recipe_yeasts(recipe_id)"))
     print("Migration: Created recipe_yeasts table")
+
+
+def _migrate_create_recipe_miscs_table(conn):
+    """Create recipe_miscs table if it doesn't exist."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "recipe_miscs" in inspector.get_table_names():
+        return
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS recipe_miscs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            use VARCHAR(20) NOT NULL,
+            time_min REAL,
+            amount_kg REAL,
+            amount_is_weight INTEGER DEFAULT 1,
+            use_for TEXT,
+            notes TEXT
+        )
+    """))
+
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_miscs_recipe ON recipe_miscs(recipe_id)"))
+    print("Migration: Created recipe_miscs table")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

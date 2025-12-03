@@ -3,9 +3,17 @@
 	import { tiltsState } from '$lib/stores/tilts.svelte';
 	import { weatherState } from '$lib/stores/weather.svelte';
 	import FermentationCard from '$lib/components/FermentationCard.svelte';
+	import type { BatchResponse, BatchProgressResponse } from '$lib/api';
+	import { fetchBatches, fetchBatchProgress } from '$lib/api';
 
 	let alertsDismissed = $state(false);
 	let alertsCollapsed = $state(false);
+
+	// Batch state
+	let batches = $state<BatchResponse[]>([]);
+	let progressMap = $state<Map<number, BatchProgressResponse>>(new Map());
+	let loading = $state(true);
+	let error = $state<string | null>(null);
 
 	onMount(async () => {
 		// Load alert dismissal state from localStorage
@@ -18,7 +26,42 @@
 				alertsDismissed = true;
 			}
 		}
+
+		// Load batches
+		await loadBatches();
 	});
+
+	async function loadBatches() {
+		loading = true;
+		error = null;
+		try {
+			// Fetch only active batches (fermenting or conditioning)
+			const allBatches = await fetchBatches();
+			batches = allBatches.filter(b => b.status === 'fermenting' || b.status === 'conditioning');
+
+			// Load progress for each active batch
+			const progressPromises = batches.map(async (b) => {
+				try {
+					const progress = await fetchBatchProgress(b.id);
+					return [b.id, progress] as const;
+				} catch {
+					return null;
+				}
+			});
+			const results = await Promise.all(progressPromises);
+			const newMap = new Map<number, BatchProgressResponse>();
+			for (const result of results) {
+				if (result) {
+					newMap.set(result[0], result[1]);
+				}
+			}
+			progressMap = newMap;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load batches';
+		} finally {
+			loading = false;
+		}
+	}
 
 	let tiltsList = $derived(Array.from(tiltsState.tilts.values()));
 

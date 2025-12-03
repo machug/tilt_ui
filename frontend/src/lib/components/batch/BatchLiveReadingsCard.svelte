@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TiltReading } from '$lib/stores/tilts.svelte';
 	import { formatGravity, getGravityUnit, formatTemp, getTempUnit } from '$lib/stores/config.svelte';
+	import { getSignalStrength, timeSince } from '$lib/utils/signal';
 	import BatchCard from './BatchCard.svelte';
 
 	interface Props {
@@ -36,25 +37,6 @@
 	function formatTempValue(value?: number | null): string {
 		if (value === undefined || value === null) return '--';
 		return formatTemp(value);
-	}
-
-	function getSignalStrength(rssiValue: number): { bars: number; color: string; label: string } {
-		if (rssiValue >= -50) return { bars: 4, color: 'var(--positive)', label: 'Excellent' };
-		if (rssiValue >= -60) return { bars: 3, color: 'var(--positive)', label: 'Good' };
-		if (rssiValue >= -70) return { bars: 2, color: 'var(--warning)', label: 'Fair' };
-		return { bars: 1, color: 'var(--negative)', label: 'Weak' };
-	}
-
-	function timeSince(isoString: string): string {
-		const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
-		if (seconds < 10) return 'just now';
-		if (seconds < 60) return `${seconds}s ago`;
-		const minutes = Math.floor(seconds / 60);
-		if (minutes < 60) return `${minutes}m ago`;
-		const hours = Math.floor(minutes / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
 	}
 
 	let signal = $derived(rssi ? getSignalStrength(rssi) : null);

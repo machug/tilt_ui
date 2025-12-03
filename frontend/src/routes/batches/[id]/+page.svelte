@@ -59,7 +59,7 @@
 		if (!batch?.device_id) return null;
 		// Extract color from device_id - handle both "tilt-red" and "RED" formats
 		const colorMatch = batch.device_id.match(/^(?:tilt-)?(\w+)$/i);
-		if (!colorMatch) return null;
+		if (!colorMatch?.[1]) return null;
 		const targetColor = colorMatch[1].toUpperCase();
 		// Find tilt with matching color
 		for (const tilt of tiltsState.tilts.values()) {

@@ -160,8 +160,6 @@
 </BatchCard>
 
 <style>
-	/* Import distinctive fonts */
-	@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Work+Sans:wght@400;500;600&display=swap');
 
 	/* Current SG - Hero Display */
 	.current-sg {
@@ -188,7 +186,6 @@
 	}
 
 	.sg-label {
-		font-family: 'Work Sans', sans-serif;
 		font-size: 0.6875rem;
 		font-weight: 600;
 		color: var(--text-muted);
@@ -198,7 +195,7 @@
 	}
 
 	.sg-value {
-		font-family: 'IBM Plex Mono', monospace;
+		font-family: var(--font-mono);
 		font-size: 2.5rem;
 		font-weight: 500;
 		color: var(--text-primary);
@@ -214,7 +211,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
-		font-family: 'Work Sans', sans-serif;
 		font-size: 0.75rem;
 		font-weight: 600;
 		color: #d97706;

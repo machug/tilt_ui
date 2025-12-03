@@ -107,11 +107,11 @@
 		return enhanced;
 	});
 
-	// Track which tilt card is expanded (only one at a time)
-	let expandedTiltId = $state<string | null>(null);
+	// Track which batch card is expanded (only one at a time)
+	let expandedBatchId = $state<number | null>(null);
 
-	function toggleExpand(tiltId: string) {
-		expandedTiltId = expandedTiltId === tiltId ? null : tiltId;
+	function toggleExpand(batchId: number) {
+		expandedBatchId = expandedBatchId === batchId ? null : batchId;
 	}
 
 	function dismissAlerts() {
@@ -164,40 +164,53 @@
 	</div>
 {/if}
 
-{#if tiltsList.length === 0}
+{#if loading}
 	<div class="empty-state">
 		<div class="empty-icon">
 			<span class="text-5xl">🍺</span>
 		</div>
-		<h2 class="empty-title">No Tilts Detected</h2>
+		<h2 class="empty-title">Loading Batches</h2>
 		<p class="empty-description">
-			{#if tiltsState.connected}
-				Waiting for Tilt hydrometers to broadcast...
-			{:else}
-				<span class="connecting-dots">Connecting to server</span>
-			{/if}
+			<span class="connecting-dots">Fetching active fermentations</span>
 		</p>
-		{#if tiltsState.connected}
-			<div class="empty-hint">
-				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-					/>
-				</svg>
-				<span>Make sure your Tilt is floating in liquid and within Bluetooth range</span>
-			</div>
-		{/if}
+	</div>
+{:else if error}
+	<div class="empty-state">
+		<div class="empty-icon">
+			<span class="text-5xl">⚠️</span>
+		</div>
+		<h2 class="empty-title">Error Loading Batches</h2>
+		<p class="empty-description">{error}</p>
+	</div>
+{:else if batches.length === 0}
+	<div class="empty-state">
+		<div class="empty-icon">
+			<span class="text-5xl">🍺</span>
+		</div>
+		<h2 class="empty-title">No Active Fermentations</h2>
+		<p class="empty-description">
+			Start a batch and set status to "Fermenting" or "Conditioning" to track it here
+		</p>
+		<div class="empty-hint">
+			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+				/>
+			</svg>
+			<span>Go to Batches → Create a new batch or update an existing batch status</span>
+		</div>
 	</div>
 {:else}
-	<div class="tilt-grid" class:single-tilt={tiltsList.length === 1}>
-		{#each tiltsList as tilt (tilt.id)}
+	<div class="tilt-grid" class:single-tilt={batches.length === 1}>
+		{#each batches as batch (batch.id)}
 			<FermentationCard
-				{tilt}
-				expanded={expandedTiltId === tilt.id}
-				wide={tiltsList.length === 1}
-				onToggleExpand={() => toggleExpand(tilt.id)}
+				{batch}
+				progress={liveProgressMap.get(batch.id)}
+				expanded={expandedBatchId === batch.id}
+				wide={batches.length === 1}
+				onToggleExpand={() => toggleExpand(batch.id)}
 			/>
 		{/each}
 	</div>

@@ -992,13 +992,14 @@ class BatchResponse(BaseModel):
     measured_attenuation: Optional[float] = None
     notes: Optional[str] = None
     created_at: datetime
+    deleted_at: Optional[datetime] = None
     recipe: Optional[RecipeResponse] = None
     # Temperature control
     heater_entity_id: Optional[str] = None
     temp_target: Optional[float] = None
     temp_hysteresis: Optional[float] = None
 
-    @field_serializer('brew_date', 'start_time', 'end_time', 'created_at')
+    @field_serializer('brew_date', 'start_time', 'end_time', 'created_at', 'deleted_at')
     def serialize_dt(self, dt: Optional[datetime]) -> Optional[str]:
         return serialize_datetime_to_utc(dt)
 

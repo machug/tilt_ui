@@ -203,6 +203,10 @@ class IngestManager:
 
         Returns 'invalid' if SG or temperature are outside valid ranges,
         otherwise returns the reading's original status.
+
+        Note: Temperature validation assumes Fahrenheit. The convert_units() method
+        (called earlier in the pipeline) converts Celsius to Fahrenheit, so by the
+        time we reach validation, all temperatures are in Fahrenheit.
         """
         # Check SG (use calibrated if available, else raw)
         sg = reading.gravity if reading.gravity is not None else reading.gravity_raw
@@ -214,6 +218,7 @@ class IngestManager:
             return ReadingStatus.INVALID.value
 
         # Check temperature (use calibrated if available, else raw)
+        # Temperature is in Fahrenheit after convert_units() call
         temp = reading.temperature if reading.temperature is not None else reading.temperature_raw
         if temp is not None and not (TEMP_MIN_F <= temp <= TEMP_MAX_F):
             logger.warning(

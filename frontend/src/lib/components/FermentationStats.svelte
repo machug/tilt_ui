@@ -28,7 +28,7 @@
 	interface Props {
 		readings: HistoricalReading[];
 		originalGravity: number | null;
-		onOgChange: (og: number | null) => void;
+		onOgChange?: (og: number | null) => void;
 		trend?: TrendPrediction | null;
 	}
 
@@ -274,7 +274,7 @@
 			</div>
 			<div class="stat-pill og-pill">
 				<span class="stat-label">OG</span>
-				{#if isEditingOg}
+				{#if onOgChange && isEditingOg}
 					<input
 						type="text"
 						bind:this={ogInputRef}
@@ -285,7 +285,7 @@
 						placeholder="1.050"
 						maxlength="5"
 					/>
-				{:else}
+				{:else if onOgChange}
 					<button type="button" class="og-btn" onclick={startEditingOg} title={stats.ogIsEstimated ? "Estimated from high reading - click to set actual OG" : "Click to edit Original Gravity"}>
 						<span class="stat-value" class:estimated={stats.ogIsEstimated}>{formatSg(stats.effectiveOg)}</span>
 						{#if stats.ogIsEstimated}
@@ -295,6 +295,11 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
 						</svg>
 					</button>
+				{:else}
+					<span class="stat-value" class:estimated={stats.ogIsEstimated}>{formatSg(stats.effectiveOg)}</span>
+					{#if stats.ogIsEstimated}
+						<span class="estimated-badge">est</span>
+					{/if}
 				{/if}
 			</div>
 			<div class="stat-pill">

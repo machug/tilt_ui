@@ -748,7 +748,6 @@ onMount(async () => {
 		<FermentationStats
 			{readings}
 			{originalGravity}
-			onOgChange={() => {}}
 			trend={currentTrend ? { predictedFg: currentTrend.predictedFg, daysToFg: currentTrend.daysToFg, r2: currentTrend.r2 } : null}
 		/>
 	{/if}

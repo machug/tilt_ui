@@ -72,11 +72,11 @@
 		saving = true;
 		try {
 			await updateBatch(batch.id, { name: trimmed });
-			// Update local state (parent should refetch, but optimistically update)
-			batch.name = trimmed;
 			isEditing = false;
+			// Parent will receive updated batch data on next refetch/WebSocket update
 		} catch (e) {
 			console.error('Failed to update batch name:', e);
+			// TODO: Show user-facing error notification
 		} finally {
 			saving = false;
 		}

@@ -27,16 +27,24 @@ router = APIRouter(prefix="/api/batches", tags=["batches"])
 async def list_batches(
     status: Optional[str] = Query(None, description="Filter by status"),
     device_id: Optional[str] = Query(None, description="Filter by device"),
+    include_deleted: bool = Query(False, description="Include soft-deleted batches"),
+    deleted_only: bool = Query(False, description="Show only deleted batches (for maintenance)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    """List batches with optional filters."""
+    """List batches with optional filters. By default excludes deleted batches."""
     query = (
         select(Batch)
         .options(selectinload(Batch.recipe).selectinload(Recipe.style))
         .order_by(Batch.created_at.desc())
     )
+
+    # Soft delete filter (default: hide deleted)
+    if deleted_only:
+        query = query.where(Batch.deleted_at.is_not(None))
+    elif not include_deleted:
+        query = query.where(Batch.deleted_at.is_(None))
 
     if status:
         query = query.where(Batch.status == status)

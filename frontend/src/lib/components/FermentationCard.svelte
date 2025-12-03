@@ -282,6 +282,15 @@
 		<div class="flex justify-between items-center pt-3 border-t border-[var(--bg-hover)]">
 			<span class="text-[11px] text-[var(--text-muted)]">Updated {lastSeenText}</span>
 			<div class="flex items-center gap-2">
+				<!-- View Details Link -->
+				<a
+					href="/batches/{batch.id}"
+					class="view-details-link"
+					aria-label="View batch details"
+				>
+					View Details
+				</a>
+
 				{#if onToggleExpand}
 					<button
 						type="button"
@@ -357,6 +366,27 @@
 
 	.chart-section.hidden {
 		display: none;
+	}
+
+	.view-details-link {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+		background: var(--bg-elevated);
+		border: 1px solid var(--bg-hover);
+		border-radius: 0.375rem;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.view-details-link:hover {
+		color: var(--accent);
+		border-color: var(--accent-muted);
+		background: var(--accent-muted);
 	}
 
 	.expand-btn {

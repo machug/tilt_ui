@@ -28,7 +28,7 @@
 	let statusUpdating = $state(false);
 	let heaterLoading = $state(false);
 
-	let batchId = $derived(parseInt($page.params.id));
+	let batchId = $derived(parseInt($page.params.id ?? '0'));
 
 	// Status configuration
 	const statusConfig: Record<string, { label: string; color: string; bg: string }> = {

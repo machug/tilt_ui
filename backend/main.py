@@ -24,6 +24,7 @@ from .scanner import TiltReading, TiltScanner
 from .services.calibration import calibration_service
 from .services.batch_linker import link_reading_to_batch
 from .state import latest_readings
+from .utils.temperature import fahrenheit_to_celsius
 from .websocket import manager
 
 # Global scanner instance
@@ -79,6 +80,7 @@ async def handle_tilt_reading(reading: TiltReading):
         await session.commit()
 
         # Build reading data for WebSocket broadcast (always broadcast)
+        # Convert temperatures from Fahrenheit to Celsius for API/WebSocket
         reading_data = {
             "id": reading.id,
             "color": reading.color,
@@ -86,8 +88,8 @@ async def handle_tilt_reading(reading: TiltReading):
             "original_gravity": tilt.original_gravity,
             "sg": sg_calibrated,
             "sg_raw": reading.sg,
-            "temp": temp_calibrated,
-            "temp_raw": reading.temp_f,
+            "temp": fahrenheit_to_celsius(temp_calibrated),  # Convert to Celsius
+            "temp_raw": fahrenheit_to_celsius(reading.temp_f),  # Convert to Celsius
             "rssi": reading.rssi,
             "last_seen": serialize_datetime_to_utc(datetime.now(timezone.utc)),
             "paired": tilt.paired,  # Include pairing status

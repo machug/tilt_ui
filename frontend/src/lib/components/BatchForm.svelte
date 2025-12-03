@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus, HeaterEntity } from '$lib/api';
 	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
-	import { configState } from '$lib/stores/config.svelte';
+	import { configState, getTempUnit } from '$lib/stores/config.svelte';
 	import { fetchAllDevices, type DeviceResponse } from '$lib/api/devices';
 	import RecipeSelector from './RecipeSelector.svelte';
 
@@ -37,6 +37,9 @@
 	let loadingHeaters = $state(false);
 	let loadingDevices = $state(false);
 	let saving = $state(false);
+
+	// Reactive temperature unit
+	let tempUnit = $derived(getTempUnit());
 	let error = $state<string | null>(null);
 	let selectedRecipe = $state<RecipeResponse | null>(null);
 
@@ -351,7 +354,7 @@
 			{#if heaterEntityId}
 				<div class="form-row">
 					<div class="form-group">
-						<label class="form-label" for="tempTarget">Target Temperature (°F)</label>
+						<label class="form-label" for="tempTarget">Target Temperature ({tempUnit})</label>
 						<input
 							type="number"
 							id="tempTarget"
@@ -365,7 +368,7 @@
 						<span class="form-hint">Leave empty to use global setting</span>
 					</div>
 					<div class="form-group">
-						<label class="form-label" for="tempHysteresis">Hysteresis (°F)</label>
+						<label class="form-label" for="tempHysteresis">Hysteresis ({tempUnit})</label>
 						<input
 							type="number"
 							id="tempHysteresis"

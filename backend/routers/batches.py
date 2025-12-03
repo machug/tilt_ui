@@ -19,6 +19,7 @@ from ..models import (
     Recipe,
 )
 from ..state import latest_readings
+from ..utils.temperature import fahrenheit_to_celsius
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
 
@@ -278,7 +279,9 @@ async def get_batch_progress(batch_id: int, db: AsyncSession = Depends(get_db)):
     if batch.device_id and batch.device_id in latest_readings:
         reading = latest_readings[batch.device_id]
         current_sg = reading.get("sg")
-        current_temp = reading.get("temp")
+        # Convert temperature from Fahrenheit to Celsius for API response
+        temp_f = reading.get("temp")
+        current_temp = fahrenheit_to_celsius(temp_f) if temp_f is not None else None
 
     # Calculate targets from recipe
     targets = {}

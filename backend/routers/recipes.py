@@ -122,9 +122,11 @@ async def import_beerxml(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid BeerXML: {str(e)}")
 
-    # Fetch the created recipe
+    # Fetch the created recipe with eager loading
     result = await db.execute(
-        select(Recipe).where(Recipe.id == recipe_id)
+        select(Recipe)
+        .options(selectinload(Recipe.style))
+        .where(Recipe.id == recipe_id)
     )
     recipe = result.scalar_one()
 

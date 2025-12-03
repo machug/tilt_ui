@@ -272,6 +272,7 @@ class Recipe(Base):
     # Relationships
     style: Mapped[Optional["Style"]] = relationship(back_populates="recipes")
     batches: Mapped[list["Batch"]] = relationship(back_populates="recipe")
+    fermentables: Mapped[list["RecipeFermentable"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
 
 
 class Batch(Base):
@@ -314,6 +315,38 @@ class Batch(Base):
     recipe: Mapped[Optional["Recipe"]] = relationship(back_populates="batches")
     device: Mapped[Optional["Device"]] = relationship()
     readings: Mapped[list["Reading"]] = relationship(back_populates="batch")
+
+
+class RecipeFermentable(Base):
+    """Fermentable ingredients (grains, extracts, sugars) in a recipe."""
+    __tablename__ = "recipe_fermentables"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+
+    # BeerXML fields
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(50))  # Grain, Sugar, Extract, Dry Extract, Adjunct
+    amount_kg: Mapped[float] = mapped_column()  # Amount in kilograms
+    yield_percent: Mapped[Optional[float]] = mapped_column()  # % yield (0-100)
+    color_lovibond: Mapped[Optional[float]] = mapped_column()  # SRM/Lovibond
+
+    # Additional metadata
+    origin: Mapped[Optional[str]] = mapped_column(String(50))
+    supplier: Mapped[Optional[str]] = mapped_column(String(100))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Advanced BeerXML fields (optional)
+    add_after_boil: Mapped[Optional[bool]] = mapped_column(default=False)
+    coarse_fine_diff: Mapped[Optional[float]] = mapped_column()  # %
+    moisture: Mapped[Optional[float]] = mapped_column()  # %
+    diastatic_power: Mapped[Optional[float]] = mapped_column()  # Lintner
+    protein: Mapped[Optional[float]] = mapped_column()  # %
+    max_in_batch: Mapped[Optional[float]] = mapped_column()  # %
+    recommend_mash: Mapped[Optional[bool]] = mapped_column()
+
+    # Relationship
+    recipe: Mapped["Recipe"] = relationship(back_populates="fermentables")
 
 
 # Pydantic Schemas

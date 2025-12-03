@@ -52,6 +52,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
         # Step 3: Migrations that depend on new tables existing
+        await conn.run_sync(_migrate_create_recipe_fermentables_table)  # Create recipe_fermentables table
         await conn.run_sync(_migrate_add_batch_id_to_readings)  # Add this line (after batches table exists)
         await conn.run_sync(_migrate_add_batch_heater_columns)  # Add heater control columns to batches
         await conn.run_sync(_migrate_add_batch_id_to_control_events)  # Add batch_id to control_events
@@ -466,6 +467,40 @@ def _migrate_add_paired_to_tilts_and_devices(conn):
         if "ix_devices_paired" not in indexes:
             conn.execute(text("CREATE INDEX ix_devices_paired ON devices (paired)"))
             print("Migration: Added index on devices.paired")
+
+
+def _migrate_create_recipe_fermentables_table(conn):
+    """Create recipe_fermentables table if it doesn't exist."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "recipe_fermentables" in inspector.get_table_names():
+        return  # Table exists
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS recipe_fermentables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            type VARCHAR(50),
+            amount_kg REAL,
+            yield_percent REAL,
+            color_lovibond REAL,
+            origin VARCHAR(50),
+            supplier VARCHAR(100),
+            notes TEXT,
+            add_after_boil INTEGER DEFAULT 0,
+            coarse_fine_diff REAL,
+            moisture REAL,
+            diastatic_power REAL,
+            protein REAL,
+            max_in_batch REAL,
+            recommend_mash INTEGER
+        )
+    """))
+
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_fermentables_recipe ON recipe_fermentables(recipe_id)"))
+    print("Migration: Created recipe_fermentables table")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

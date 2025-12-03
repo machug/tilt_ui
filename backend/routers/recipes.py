@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Recipe, RecipeCreate, RecipeResponse
-from ..services.beerxml_parser import parse_beerxml
+from ..services.recipe_importer import import_beerxml_to_db
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -105,53 +105,24 @@ async def import_beerxml(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 1MB)")
 
-    # Parse BeerXML
+    # Parse and import BeerXML
     try:
         xml_content = content.decode("utf-8")
-        parsed_recipes = parse_beerxml(xml_content)
+        recipe_id = await import_beerxml_to_db(db, xml_content)
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid BeerXML: {str(e)}")
 
-    if not parsed_recipes:
-        raise HTTPException(status_code=400, detail="No recipes found in file")
+    # Fetch the created recipe
+    result = await db.execute(
+        select(Recipe).where(Recipe.id == recipe_id)
+    )
+    recipe = result.scalar_one()
 
-    # Create Recipe models
-    created_recipes = []
-    for parsed in parsed_recipes:
-        recipe = Recipe(
-            name=parsed.name,
-            author=parsed.author,
-            type=parsed.type,
-            og_target=parsed.og,
-            fg_target=parsed.fg,
-            ibu_target=parsed.ibu,
-            srm_target=parsed.srm,
-            abv_target=parsed.abv,
-            batch_size=parsed.batch_size,
-            beerxml_content=parsed.raw_xml,
-        )
-
-        # Add yeast data
-        if parsed.yeast:
-            recipe.yeast_name = parsed.yeast.name
-            recipe.yeast_lab = parsed.yeast.lab
-            recipe.yeast_product_id = parsed.yeast.product_id
-            recipe.yeast_temp_min = parsed.yeast.temp_min
-            recipe.yeast_temp_max = parsed.yeast.temp_max
-            recipe.yeast_attenuation = parsed.yeast.attenuation
-
-        db.add(recipe)
-        created_recipes.append(recipe)
-
-    await db.commit()
-
-    # Refresh all to get IDs
-    for recipe in created_recipes:
-        await db.refresh(recipe)
-
-    return created_recipes
+    return [recipe]
 
 
 @router.delete("/{recipe_id}")

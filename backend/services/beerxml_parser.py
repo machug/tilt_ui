@@ -42,6 +42,19 @@ class ParsedStyle:
     category_number: Optional[str] = None
     style_letter: Optional[str] = None
     guide: Optional[str] = None
+    type: Optional[str] = None
+    og_min: Optional[float] = None
+    og_max: Optional[float] = None
+    fg_min: Optional[float] = None
+    fg_max: Optional[float] = None
+    ibu_min: Optional[float] = None
+    ibu_max: Optional[float] = None
+    color_min: Optional[float] = None
+    color_max: Optional[float] = None
+    abv_min: Optional[float] = None
+    abv_max: Optional[float] = None
+    carb_min: Optional[float] = None
+    carb_max: Optional[float] = None
 
 
 @dataclass
@@ -117,6 +130,28 @@ class ParsedRecipe:
     yeasts: list[ParsedYeast] = field(default_factory=list)
     miscs: list[ParsedMisc] = field(default_factory=list)
     raw_xml: str = ""
+
+    # Expanded BeerXML fields
+    brewer: Optional[str] = None
+    asst_brewer: Optional[str] = None
+    boil_size_l: Optional[float] = None
+    boil_time_min: Optional[int] = None
+    efficiency_percent: Optional[float] = None
+    primary_age_days: Optional[int] = None
+    primary_temp_c: Optional[float] = None
+    secondary_age_days: Optional[int] = None
+    secondary_temp_c: Optional[float] = None
+    tertiary_age_days: Optional[int] = None
+    tertiary_temp_c: Optional[float] = None
+    age_days: Optional[int] = None
+    age_temp_c: Optional[float] = None
+    carbonation_vols: Optional[float] = None
+    forced_carbonation: Optional[bool] = None
+    priming_sugar_name: Optional[str] = None
+    priming_sugar_amount_kg: Optional[float] = None
+    taste_notes: Optional[str] = None
+    taste_rating: Optional[float] = None
+    date: Optional[str] = None
 
 
 def parse_beerxml(xml_content: str) -> list[ParsedRecipe]:
@@ -290,7 +325,29 @@ def _parse_recipe(elem, raw_xml: str) -> ParsedRecipe:
         srm=_get_float(elem, 'EST_COLOR'),
         abv=_get_float(elem, 'EST_ABV'),
         batch_size=_get_float(elem, 'BATCH_SIZE'),
-        raw_xml=raw_xml
+        raw_xml=raw_xml,
+
+        # Expanded BeerXML fields
+        brewer=_get_text(elem, 'BREWER'),
+        asst_brewer=_get_text(elem, 'ASST_BREWER'),
+        boil_size_l=_get_float(elem, 'BOIL_SIZE'),
+        boil_time_min=_get_int(elem, 'BOIL_TIME'),
+        efficiency_percent=_get_float(elem, 'EFFICIENCY'),
+        primary_age_days=_get_int(elem, 'PRIMARY_AGE'),
+        primary_temp_c=_get_float(elem, 'PRIMARY_TEMP'),
+        secondary_age_days=_get_int(elem, 'SECONDARY_AGE'),
+        secondary_temp_c=_get_float(elem, 'SECONDARY_TEMP'),
+        tertiary_age_days=_get_int(elem, 'TERTIARY_AGE'),
+        tertiary_temp_c=_get_float(elem, 'TERTIARY_TEMP'),
+        age_days=_get_int(elem, 'AGE'),
+        age_temp_c=_get_float(elem, 'AGE_TEMP'),
+        carbonation_vols=_get_float(elem, 'CARBONATION'),
+        forced_carbonation=_get_bool(elem, 'FORCED_CARBONATION'),
+        priming_sugar_name=_get_text(elem, 'PRIMING_SUGAR_NAME'),
+        priming_sugar_amount_kg=_get_float(elem, 'PRIMING_SUGAR_EQUIV'),
+        taste_notes=_get_text(elem, 'TASTE_NOTES'),
+        taste_rating=_get_float(elem, 'TASTE_RATING'),
+        date=_get_text(elem, 'DATE'),
     )
 
     # Parse style
@@ -302,6 +359,19 @@ def _parse_recipe(elem, raw_xml: str) -> ParsedRecipe:
             category_number=_get_text(style_elem, 'CATEGORY_NUMBER'),
             style_letter=_get_text(style_elem, 'STYLE_LETTER'),
             guide=_get_text(style_elem, 'STYLE_GUIDE'),
+            type=_get_text(style_elem, 'TYPE'),
+            og_min=_get_float(style_elem, 'OG_MIN'),
+            og_max=_get_float(style_elem, 'OG_MAX'),
+            fg_min=_get_float(style_elem, 'FG_MIN'),
+            fg_max=_get_float(style_elem, 'FG_MAX'),
+            ibu_min=_get_float(style_elem, 'IBU_MIN'),
+            ibu_max=_get_float(style_elem, 'IBU_MAX'),
+            color_min=_get_float(style_elem, 'COLOR_MIN'),
+            color_max=_get_float(style_elem, 'COLOR_MAX'),
+            abv_min=_get_float(style_elem, 'ABV_MIN'),
+            abv_max=_get_float(style_elem, 'ABV_MAX'),
+            carb_min=_get_float(style_elem, 'CARB_MIN'),
+            carb_max=_get_float(style_elem, 'CARB_MAX'),
         )
 
     # Parse first yeast (for backward compatibility with old single-yeast field)

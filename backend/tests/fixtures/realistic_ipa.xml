@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RECIPES>
+  <RECIPE>
+    <NAME>West Coast IPA</NAME>
+    <VERSION>1</VERSION>
+    <TYPE>All Grain</TYPE>
+    <BREWER>John Brewer</BREWER>
+    <ASST_BREWER>Jane Assistant</ASST_BREWER>
+    <BATCH_SIZE>20.0</BATCH_SIZE>
+    <BOIL_SIZE>27.0</BOIL_SIZE>
+    <BOIL_TIME>60</BOIL_TIME>
+    <EFFICIENCY>75.0</EFFICIENCY>
+    <OG>1.065</OG>
+    <FG>1.012</FG>
+    <IBU>65</IBU>
+    <EST_COLOR>8.5</EST_COLOR>
+    <EST_ABV>7.0</EST_ABV>
+    <CARBONATION>2.4</CARBONATION>
+    <FORCED_CARBONATION>FALSE</FORCED_CARBONATION>
+    <PRIMING_SUGAR_NAME>Corn Sugar</PRIMING_SUGAR_NAME>
+    <CARBONATION_TEMP>20</CARBONATION_TEMP>
+    <AGE>21</AGE>
+    <AGE_TEMP>4</AGE_TEMP>
+    <PRIMARY_AGE>14</PRIMARY_AGE>
+    <PRIMARY_TEMP>20</PRIMARY_TEMP>
+    <SECONDARY_AGE>7</SECONDARY_AGE>
+    <SECONDARY_TEMP>20</SECONDARY_TEMP>
+    <DATE>20 Dec 2025</DATE>
+    <TASTE_NOTES>Clean bitterness with strong citrus and pine notes. Dry finish.</TASTE_NOTES>
+    <TASTE_RATING>45</TASTE_RATING>
+    <NOTES>Classic West Coast IPA with big hop flavor and aroma. Ferment cool for clean finish.</NOTES>
+
+    <STYLE>
+      <NAME>American IPA</NAME>
+      <CATEGORY>IPA</CATEGORY>
+      <CATEGORY_NUMBER>21</CATEGORY_NUMBER>
+      <STYLE_LETTER>A</STYLE_LETTER>
+      <STYLE_GUIDE>BJCP 2015</STYLE_GUIDE>
+      <VERSION>1</VERSION>
+      <TYPE>Ale</TYPE>
+      <OG_MIN>1.056</OG_MIN>
+      <OG_MAX>1.070</OG_MAX>
+      <FG_MIN>1.008</FG_MIN>
+      <FG_MAX>1.014</FG_MAX>
+      <IBU_MIN>40</IBU_MIN>
+      <IBU_MAX>70</IBU_MAX>
+      <COLOR_MIN>6</COLOR_MIN>
+      <COLOR_MAX>14</COLOR_MAX>
+      <ABV_MIN>5.5</ABV_MIN>
+      <ABV_MAX>7.5</ABV_MAX>
+      <CARB_MIN>2.2</CARB_MIN>
+      <CARB_MAX>2.7</CARB_MAX>
+    </STYLE>
+
+    <FERMENTABLES>
+      <FERMENTABLE>
+        <NAME>Pale Malt 2-Row</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Grain</TYPE>
+        <AMOUNT>5.5</AMOUNT>
+        <YIELD>80.0</YIELD>
+        <COLOR>2.0</COLOR>
+        <ADD_AFTER_BOIL>FALSE</ADD_AFTER_BOIL>
+        <ORIGIN>US</ORIGIN>
+        <SUPPLIER>Briess</SUPPLIER>
+        <NOTES>Base malt for American ales</NOTES>
+        <COARSE_FINE_DIFF>1.5</COARSE_FINE_DIFF>
+        <MOISTURE>4.0</MOISTURE>
+        <DIASTATIC_POWER>140.0</DIASTATIC_POWER>
+        <PROTEIN>11.5</PROTEIN>
+        <MAX_IN_BATCH>100.0</MAX_IN_BATCH>
+        <RECOMMEND_MASH>TRUE</RECOMMEND_MASH>
+      </FERMENTABLE>
+      <FERMENTABLE>
+        <NAME>Munich Malt</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Grain</TYPE>
+        <AMOUNT>0.5</AMOUNT>
+        <YIELD>78.0</YIELD>
+        <COLOR>10.0</COLOR>
+        <ADD_AFTER_BOIL>FALSE</ADD_AFTER_BOIL>
+        <ORIGIN>Germany</ORIGIN>
+        <SUPPLIER>Weyermann</SUPPLIER>
+        <NOTES>Adds malty sweetness and golden color</NOTES>
+        <MOISTURE>4.5</MOISTURE>
+        <DIASTATIC_POWER>100.0</DIASTATIC_POWER>
+        <PROTEIN>11.0</PROTEIN>
+        <MAX_IN_BATCH>80.0</MAX_IN_BATCH>
+        <RECOMMEND_MASH>TRUE</RECOMMEND_MASH>
+      </FERMENTABLE>
+      <FERMENTABLE>
+        <NAME>Crystal 40L</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Grain</TYPE>
+        <AMOUNT>0.3</AMOUNT>
+        <YIELD>75.0</YIELD>
+        <COLOR>40.0</COLOR>
+        <ADD_AFTER_BOIL>FALSE</ADD_AFTER_BOIL>
+        <ORIGIN>US</ORIGIN>
+        <SUPPLIER>Briess</SUPPLIER>
+        <NOTES>Caramel malt for body and residual sweetness</NOTES>
+        <MOISTURE>5.0</MOISTURE>
+        <DIASTATIC_POWER>0.0</DIASTATIC_POWER>
+        <PROTEIN>13.0</PROTEIN>
+        <MAX_IN_BATCH>15.0</MAX_IN_BATCH>
+        <RECOMMEND_MASH>FALSE</RECOMMEND_MASH>
+      </FERMENTABLE>
+    </FERMENTABLES>
+
+    <HOPS>
+      <HOP>
+        <NAME>Magnum</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>12.0</ALPHA>
+        <AMOUNT>0.020</AMOUNT>
+        <USE>Boil</USE>
+        <TIME>60</TIME>
+        <NOTES>Clean bittering hop</NOTES>
+        <TYPE>Bittering</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>5.5</BETA>
+        <HSI>35.0</HSI>
+        <ORIGIN>US</ORIGIN>
+      </HOP>
+      <HOP>
+        <NAME>Centennial</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>10.0</ALPHA>
+        <AMOUNT>0.028</AMOUNT>
+        <USE>Boil</USE>
+        <TIME>20</TIME>
+        <NOTES>Floral and citrus character</NOTES>
+        <TYPE>Both</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>4.0</BETA>
+        <HSI>30.0</HSI>
+        <ORIGIN>US</ORIGIN>
+        <HUMULENE>18.0</HUMULENE>
+        <CARYOPHYLLENE>6.0</CARYOPHYLLENE>
+        <COHUMULONE>28.0</COHUMULONE>
+        <MYRCENE>45.0</MYRCENE>
+      </HOP>
+      <HOP>
+        <NAME>Simcoe</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>13.0</ALPHA>
+        <AMOUNT>0.028</AMOUNT>
+        <USE>Boil</USE>
+        <TIME>10</TIME>
+        <NOTES>Pine and citrus aroma</NOTES>
+        <TYPE>Aroma</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>4.0</BETA>
+        <HSI>28.0</HSI>
+        <ORIGIN>US</ORIGIN>
+        <HUMULENE>15.0</HUMULENE>
+        <CARYOPHYLLENE>10.0</CARYOPHYLLENE>
+        <COHUMULONE>15.0</COHUMULONE>
+        <MYRCENE>60.0</MYRCENE>
+      </HOP>
+      <HOP>
+        <NAME>Cascade</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>5.5</ALPHA>
+        <AMOUNT>0.028</AMOUNT>
+        <USE>Boil</USE>
+        <TIME>5</TIME>
+        <NOTES>Floral, citrus, grapefruit</NOTES>
+        <TYPE>Aroma</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>5.0</BETA>
+        <HSI>25.0</HSI>
+        <ORIGIN>US</ORIGIN>
+        <HUMULENE>10.0</HUMULENE>
+        <CARYOPHYLLENE>5.0</CARYOPHYLLENE>
+        <COHUMULONE>33.0</COHUMULONE>
+        <MYRCENE>50.0</MYRCENE>
+      </HOP>
+      <HOP>
+        <NAME>Citra</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>12.0</ALPHA>
+        <AMOUNT>0.056</AMOUNT>
+        <USE>Dry Hop</USE>
+        <TIME>7</TIME>
+        <NOTES>Tropical fruit and citrus aroma</NOTES>
+        <TYPE>Aroma</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>3.5</BETA>
+        <HSI>24.0</HSI>
+        <ORIGIN>US</ORIGIN>
+        <HUMULENE>11.0</HUMULENE>
+        <CARYOPHYLLENE>6.0</CARYOPHYLLENE>
+        <COHUMULONE>22.0</COHUMULONE>
+        <MYRCENE>60.0</MYRCENE>
+      </HOP>
+      <HOP>
+        <NAME>Mosaic</NAME>
+        <VERSION>1</VERSION>
+        <ALPHA>12.25</ALPHA>
+        <AMOUNT>0.056</AMOUNT>
+        <USE>Dry Hop</USE>
+        <TIME>7</TIME>
+        <NOTES>Blueberry, tangerine, papaya, rose</NOTES>
+        <TYPE>Aroma</TYPE>
+        <FORM>Pellet</FORM>
+        <BETA>3.4</BETA>
+        <HSI>23.0</HSI>
+        <ORIGIN>US</ORIGIN>
+        <HUMULENE>13.0</HUMULENE>
+        <CARYOPHYLLENE>8.0</CARYOPHYLLENE>
+        <COHUMULONE>24.0</COHUMULONE>
+        <MYRCENE>50.0</MYRCENE>
+      </HOP>
+    </HOPS>
+
+    <YEASTS>
+      <YEAST>
+        <NAME>Safale US-05</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Ale</TYPE>
+        <FORM>Dry</FORM>
+        <AMOUNT>0.0115</AMOUNT>
+        <AMOUNT_IS_WEIGHT>TRUE</AMOUNT_IS_WEIGHT>
+        <LABORATORY>Fermentis</LABORATORY>
+        <PRODUCT_ID>US-05</PRODUCT_ID>
+        <MIN_TEMPERATURE>15.0</MIN_TEMPERATURE>
+        <MAX_TEMPERATURE>24.0</MAX_TEMPERATURE>
+        <FLOCCULATION>Medium</FLOCCULATION>
+        <ATTENUATION>81.0</ATTENUATION>
+        <NOTES>American ale yeast producing well balanced beers with low diacetyl and a very clean, crisp end palate</NOTES>
+        <BEST_FOR>American ales, IPAs, Pale Ales</BEST_FOR>
+        <TIMES_CULTURED>0</TIMES_CULTURED>
+        <MAX_REUSE>5</MAX_REUSE>
+        <ADD_TO_SECONDARY>FALSE</ADD_TO_SECONDARY>
+      </YEAST>
+      <YEAST>
+        <NAME>White Labs WLP001 California Ale</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Ale</TYPE>
+        <FORM>Liquid</FORM>
+        <AMOUNT>0.100</AMOUNT>
+        <AMOUNT_IS_WEIGHT>FALSE</AMOUNT_IS_WEIGHT>
+        <LABORATORY>White Labs</LABORATORY>
+        <PRODUCT_ID>WLP001</PRODUCT_ID>
+        <MIN_TEMPERATURE>20.0</MIN_TEMPERATURE>
+        <MAX_TEMPERATURE>23.0</MAX_TEMPERATURE>
+        <FLOCCULATION>Medium</FLOCCULATION>
+        <ATTENUATION>76.0</ATTENUATION>
+        <NOTES>This yeast is famous for its clean flavors, balance and ability to be used in almost any style ale</NOTES>
+        <BEST_FOR>American Ales, IPA, Amber, Browns</BEST_FOR>
+        <TIMES_CULTURED>0</TIMES_CULTURED>
+        <MAX_REUSE>10</MAX_REUSE>
+        <ADD_TO_SECONDARY>FALSE</ADD_TO_SECONDARY>
+      </YEAST>
+    </YEASTS>
+
+    <MISCS>
+      <MISC>
+        <NAME>Irish Moss</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Fining</TYPE>
+        <USE>Boil</USE>
+        <TIME>15</TIME>
+        <AMOUNT>0.005</AMOUNT>
+        <AMOUNT_IS_WEIGHT>TRUE</AMOUNT_IS_WEIGHT>
+        <USE_FOR>Clarity</USE_FOR>
+        <NOTES>Helps protein flocculation for clearer beer</NOTES>
+      </MISC>
+      <MISC>
+        <NAME>Gypsum (Calcium Sulfate)</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Water Agent</TYPE>
+        <USE>Mash</USE>
+        <TIME>60</TIME>
+        <AMOUNT>0.004</AMOUNT>
+        <AMOUNT_IS_WEIGHT>TRUE</AMOUNT_IS_WEIGHT>
+        <USE_FOR>Water chemistry - enhance hop bitterness</USE_FOR>
+        <NOTES>Adds calcium and sulfate to enhance hop character</NOTES>
+      </MISC>
+      <MISC>
+        <NAME>Calcium Chloride</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Water Agent</TYPE>
+        <USE>Mash</USE>
+        <TIME>60</TIME>
+        <AMOUNT>0.002</AMOUNT>
+        <AMOUNT_IS_WEIGHT>TRUE</AMOUNT_IS_WEIGHT>
+        <USE_FOR>Water chemistry - malt character</USE_FOR>
+        <NOTES>Adds calcium and chloride for malt sweetness</NOTES>
+      </MISC>
+      <MISC>
+        <NAME>Coriander</NAME>
+        <VERSION>1</VERSION>
+        <TYPE>Spice</TYPE>
+        <USE>Boil</USE>
+        <TIME>5</TIME>
+        <AMOUNT>0.015</AMOUNT>
+        <AMOUNT_IS_WEIGHT>TRUE</AMOUNT_IS_WEIGHT>
+        <USE_FOR>Flavor complexity</USE_FOR>
+        <NOTES>Subtle citrus and spice notes</NOTES>
+      </MISC>
+    </MISCS>
+
+  </RECIPE>
+</RECIPES>

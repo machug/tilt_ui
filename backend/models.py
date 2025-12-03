@@ -274,6 +274,7 @@ class Recipe(Base):
     batches: Mapped[list["Batch"]] = relationship(back_populates="recipe")
     fermentables: Mapped[list["RecipeFermentable"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
     hops: Mapped[list["RecipeHop"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
+    yeasts: Mapped[list["RecipeYeast"]] = relationship(back_populates="recipe", cascade="all, delete-orphan")
 
 
 class Batch(Base):
@@ -382,6 +383,41 @@ class RecipeHop(Base):
 
     # Relationship
     recipe: Mapped["Recipe"] = relationship(back_populates="hops")
+
+
+class RecipeYeast(Base):
+    """Yeast strains in a recipe."""
+    __tablename__ = "recipe_yeasts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+
+    # BeerXML fields
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    lab: Mapped[Optional[str]] = mapped_column(String(100))
+    product_id: Mapped[Optional[str]] = mapped_column(String(50))
+    type: Mapped[Optional[str]] = mapped_column(String(20))  # Ale, Lager, Wheat, Wine, Champagne
+    form: Mapped[Optional[str]] = mapped_column(String(20))  # Liquid, Dry, Slant, Culture
+
+    # Fermentation characteristics
+    attenuation_percent: Mapped[Optional[float]] = mapped_column()  # % (0-100)
+    temp_min_c: Mapped[Optional[float]] = mapped_column()  # Celsius
+    temp_max_c: Mapped[Optional[float]] = mapped_column()  # Celsius
+    flocculation: Mapped[Optional[str]] = mapped_column(String(20))  # Low, Medium, High, Very High
+
+    # Pitching
+    amount_l: Mapped[Optional[float]] = mapped_column()  # Liters (if liquid)
+    amount_kg: Mapped[Optional[float]] = mapped_column()  # Kg (if dry)
+    add_to_secondary: Mapped[Optional[bool]] = mapped_column(default=False)
+
+    # Advanced fields
+    best_for: Mapped[Optional[str]] = mapped_column(Text)
+    times_cultured: Mapped[Optional[int]] = mapped_column()
+    max_reuse: Mapped[Optional[int]] = mapped_column()
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Relationship
+    recipe: Mapped["Recipe"] = relationship(back_populates="yeasts")
 
 
 # Pydantic Schemas

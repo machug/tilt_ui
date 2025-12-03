@@ -11,7 +11,7 @@
 	let showDeleteConfirm = $state(false);
 	let deleting = $state(false);
 
-	let recipeId = $derived(() => {
+	let recipeId = $derived.by(() => {
 		const id = parseInt($page.params.id || '', 10);
 		return isNaN(id) || id <= 0 ? null : id;
 	});

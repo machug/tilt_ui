@@ -82,8 +82,15 @@
 	let loadingDevices = $state(false);
 	let saving = $state(false);
 
-	// Reactive temperature unit
+	// Reactive temperature unit and validation ranges
 	let tempUnit = $derived(getTempUnit());
+
+	// Temperature validation ranges (depend on unit preference)
+	let tempTargetMin = $derived(configState.config.temp_units === 'C' ? 0 : 32);
+	let tempTargetMax = $derived(configState.config.temp_units === 'C' ? 38 : 100);
+	let tempHysteresisMin = $derived(configState.config.temp_units === 'C' ? 0.3 : 0.5);
+	let tempHysteresisMax = $derived(configState.config.temp_units === 'C' ? 5.5 : 10);
+
 	let error = $state<string | null>(null);
 	let selectedRecipe = $state<RecipeResponse | null>(null);
 
@@ -406,8 +413,8 @@
 							bind:value={tempTarget}
 							placeholder="68"
 							step="0.5"
-							min="32"
-							max="100"
+							min={tempTargetMin}
+							max={tempTargetMax}
 						/>
 						<span class="form-hint">Leave empty to use global setting</span>
 					</div>
@@ -420,8 +427,8 @@
 							bind:value={tempHysteresis}
 							placeholder="1.0"
 							step="0.5"
-							min="0.5"
-							max="10"
+							min={tempHysteresisMin}
+							max={tempHysteresisMax}
 						/>
 						<span class="form-hint">Leave empty to use global setting</span>
 					</div>

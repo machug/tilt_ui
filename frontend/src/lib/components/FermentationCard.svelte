@@ -10,9 +10,10 @@
 		expanded?: boolean;
 		wide?: boolean;
 		onToggleExpand?: () => void;
+		onBatchUpdated?: () => Promise<void>;
 	}
 
-	let { batch, progress, expanded = false, wide = false, onToggleExpand }: Props = $props();
+	let { batch, progress, expanded = false, wide = false, onToggleExpand, onBatchUpdated }: Props = $props();
 
 	// Derive device reading from batch.device_id + WebSocket state
 	let deviceReading = $derived.by(() => {
@@ -54,10 +55,12 @@
 	let editValue = $state('');
 	let inputRef = $state<HTMLInputElement | null>(null);
 	let saving = $state(false);
+	let saveError = $state<string | null>(null);
 
 	function startEditing() {
 		editValue = displayName;
 		isEditing = true;
+		saveError = null;
 		// Focus input after DOM update
 		setTimeout(() => inputRef?.focus(), 0);
 	}
@@ -67,16 +70,22 @@
 		const trimmed = editValue.trim();
 		if (!trimmed || trimmed === displayName) {
 			isEditing = false;
+			saveError = null;
 			return;
 		}
 		saving = true;
+		saveError = null;
 		try {
 			await updateBatch(batch.id, { name: trimmed });
 			isEditing = false;
-			// Parent will receive updated batch data on next refetch/WebSocket update
+			// Trigger parent to refetch batches
+			if (onBatchUpdated) {
+				await onBatchUpdated();
+			}
 		} catch (e) {
 			console.error('Failed to update batch name:', e);
-			// TODO: Show user-facing error notification
+			saveError = e instanceof Error ? e.message : 'Failed to save batch name';
+			// Keep editing mode open on error so user can retry
 		} finally {
 			saving = false;
 		}
@@ -155,16 +164,22 @@
 		<div class="flex justify-between items-start mb-5">
 			<div class="flex-1 min-w-0 mr-3">
 				{#if isEditing}
-					<input
-						type="text"
-						bind:this={inputRef}
-						bind:value={editValue}
-						onblur={saveEdit}
-						onkeydown={handleKeydown}
-						disabled={saving}
-						class="beer-name-input"
-						maxlength="100"
-					/>
+					<div class="flex flex-col gap-1">
+						<input
+							type="text"
+							bind:this={inputRef}
+							bind:value={editValue}
+							onblur={saveEdit}
+							onkeydown={handleKeydown}
+							disabled={saving}
+							class="beer-name-input"
+							class:error={saveError}
+							maxlength="100"
+						/>
+						{#if saveError}
+							<span class="error-message">{saveError}</span>
+						{/if}
+					</div>
 				{:else}
 					<button
 						type="button"
@@ -449,6 +464,16 @@
 
 	.beer-name-input:disabled {
 		opacity: 0.6;
+	}
+
+	.beer-name-input.error {
+		border-color: var(--negative);
+	}
+
+	.error-message {
+		font-size: 0.75rem;
+		color: var(--negative);
+		margin-top: 0.25rem;
 	}
 
 	.pairing-badge {

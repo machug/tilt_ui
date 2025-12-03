@@ -211,6 +211,7 @@
 				expanded={expandedBatchId === batch.id}
 				wide={batches.length === 1}
 				onToggleExpand={() => toggleExpand(batch.id)}
+				onBatchUpdated={loadBatches}
 			/>
 		{/each}
 	</div>

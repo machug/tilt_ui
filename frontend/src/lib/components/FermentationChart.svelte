@@ -212,7 +212,38 @@
 				drag: { x: false, y: false, setScale: false }
 			},
 			legend: {
-				show: false
+				show: true,
+				live: true,
+				markers: {
+					show: false
+				}
+			},
+			hooks: {
+				setCursor: [
+					(u: uPlot) => {
+						const idx = u.cursor.idx;
+						if (idx === null || idx === undefined) return;
+
+						// Update legend with crosshair values
+						const legendEl = u.root.querySelector('.u-legend') as HTMLElement;
+						if (!legendEl) return;
+
+						legendEl.style.cssText = `
+							position: absolute;
+							top: 12px;
+							left: 12px;
+							background: rgba(24, 24, 27, 0.95);
+							border: 1px solid var(--border-default);
+							border-radius: 0.5rem;
+							padding: 0.75rem;
+							font-family: 'JetBrains Mono', monospace;
+							font-size: 0.6875rem;
+							pointer-events: none;
+							box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+							backdrop-filter: blur(8px);
+						`;
+					}
+				]
 			},
 			scales: {
 				x: { time: true },
@@ -273,13 +304,17 @@
 				}
 			],
 			series: [
-				{}, // x series (timestamps)
+				{
+					// x series (timestamps)
+					value: (u: uPlot, v: number) => formatTimeInTz(v, tz, false) + ' ' + formatTimeInTz(v, tz, true)
+				},
 				{
 					// Gravity series (SG/Plato/Brix)
 					label: gravityUnit === 'SG' ? 'Gravity' : gravityUnit === '°P' ? 'Plato' : 'Brix',
 					scale: 'sg',
 					stroke: sgColor,
 					width: 2,
+					value: (u: uPlot, v: number | null) => v !== null ? formatGravity(v) : '--',
 					fill: (u: uPlot, idx: number) => {
 						const gradient = u.ctx.createLinearGradient(0, u.bbox.top, 0, u.bbox.top + u.bbox.height);
 						gradient.addColorStop(0, SG_GLOW);
@@ -291,11 +326,12 @@
 				},
 				{
 					// Wort Temp series
-					label: 'Wort Temp',
+					label: 'Wort',
 					scale: 'temp',
 					stroke: tempColor,
 					width: 1.5,
 					dash: [4, 4],
+					value: (u: uPlot, v: number | null) => v !== null ? v.toFixed(1) + '°' : '--',
 					points: { show: false },
 					paths: uPlot.paths.spline?.() // Smooth spline interpolation
 				},
@@ -306,6 +342,7 @@
 					stroke: CYAN,
 					width: 1.5,
 					dash: [2, 4],
+					value: (u: uPlot, v: number | null) => v !== null ? v.toFixed(1) + '°' : '--',
 					points: { show: false },
 					paths: uPlot.paths.spline?.() // Smooth spline interpolation
 				},
@@ -316,6 +353,7 @@
 					stroke: TREND_COLOR,
 					width: 2,
 					dash: [8, 4],
+					value: (u: uPlot, v: number | null) => v !== null ? formatGravity(v) : '--',
 					points: { show: false },
 					show: showTrendLine
 					// Linear path (no spline for trend line)
@@ -928,6 +966,30 @@ onMount(async () => {
 
 	.chart-container :global(.u-wrap) {
 		background: transparent !important;
+	}
+
+	.chart-container :global(.u-legend) {
+		color: var(--text-primary);
+		line-height: 1.6;
+	}
+
+	.chart-container :global(.u-legend .u-series) {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		margin-bottom: 0.25rem;
+	}
+
+	.chart-container :global(.u-legend .u-label) {
+		color: var(--text-muted);
+		min-width: 4.5rem;
+	}
+
+	.chart-container :global(.u-legend .u-value) {
+		color: var(--text-primary);
+		font-weight: 500;
+		text-align: right;
+		flex: 1;
 	}
 
 	.chart-error,

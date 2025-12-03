@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Chart Crosshair Tooltips** (#55) - Display exact reading values at crosshair position
+  - Shows timestamp, gravity (with proper unit formatting), wort temperature, ambient temperature, and trend line values
+  - Floating tooltip with semi-transparent background and backdrop blur for readability
+  - No more guessing values from axis labels
+- **Reading Smoothing at Source** (#55) - Moving average filter applied during BLE reading ingestion
+  - Uses existing `smoothing_enabled` and `smoothing_samples` config settings from System page
+  - Applied after calibration but before storage for consistent smoothed data across all consumers
+  - Per-device buffers maintain recent readings for window calculation
+  - Smoothed values stored in database benefit charts, exports, and Home Assistant integration
+
+### Fixed
+- **Chart Outlier Spikes** (#55) - Physically impossible readings no longer corrupt charts
+  - Added validation for SG range (0.500-1.200) and temperature range (32-212°F)
+  - Invalid readings marked with `status='invalid'` and filtered from all API responses
+  - Historical outliers cleaned up via migration (83 outliers marked invalid)
+  - Charts now only display validated readings
+
+### Technical
+- Created `SmoothingService` with moving average algorithm in `backend/services/smoothing.py`
+- Added outlier validation in `backend/main.py` `handle_tilt_reading()` function
+- Updated `backend/routers/tilts.py` to filter `status='valid'` readings in all queries
+- Migration script `backend/migrations/mark_outliers_invalid.py` to clean historical data
+- uPlot legend enabled with live updates and custom tooltip styling
+
+### Code Review Fixes (PR #56)
+- **Database Migration**: Added status column migration with index for query performance in `backend/database.py`
+- **Validation Order**: Moved outlier validation BEFORE smoothing to prevent invalid readings from contaminating moving average buffer
+- **HTTP Device Support**: Extended validation and smoothing to HTTP ingestion path (iSpindel/GravityMon) in `backend/services/ingest_manager.py`
+- **Config Caching**: Implemented 30-second cache for smoothing config to reduce DB queries from every-reading to periodic refresh
+- **Null Safety**: Fixed smoothing service query to use `is not None` check instead of truthiness to handle edge cases with zero values
+- **Buffer Cleanup**: Added automatic cleanup of inactive device buffers (1-hour TTL) to prevent memory growth
+- **Data Migration**: Integrated historical outlier marking into `init_db()` for automatic cleanup on deployment
+
 ## [2.3.2] - 2025-12-03
 
 ### Added

@@ -68,6 +68,7 @@ async def init_db():
 
         # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
+        await conn.run_sync(_migrate_mark_outliers_invalid)  # Mark historical outliers
 
 
 def _migrate_add_original_gravity(conn):
@@ -266,11 +267,12 @@ def _migrate_add_reading_columns(conn):
                 # Column might already exist in some edge cases
                 print(f"Migration: Skipping {col_name} - {e}")
 
-    # Create index for device_id if it doesn't exist
+    # Create indexes if they don't exist
     try:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_device_id ON readings(device_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_readings_status ON readings(status)"))
     except Exception:
-        pass  # Index might already exist
+        pass  # Indexes might already exist
 
 
 def _migrate_readings_nullable_tilt_id(conn):
@@ -647,6 +649,49 @@ def _migrate_add_recipe_expanded_fields(conn):
             conn.execute(text(f"ALTER TABLE recipes ADD COLUMN {col_name} {col_def}"))
 
     print("Migration: Added expanded BeerXML fields to recipes table")
+
+
+def _migrate_mark_outliers_invalid(conn):
+    """Mark historical outlier readings as invalid.
+
+    This migration finds existing readings with physically impossible values
+    and marks them as invalid so they're filtered from charts.
+
+    Valid ranges:
+    - SG: 0.500-1.200 (beer is typically 1.000-1.120)
+    - Temp: 32-212°F (freezing to boiling)
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "readings" not in inspector.get_table_names():
+        return
+
+    columns = [c["name"] for c in inspector.get_columns("readings")]
+    if "status" not in columns:
+        return  # Status column doesn't exist yet, skip
+
+    # Mark SG outliers
+    result = conn.execute(text("""
+        UPDATE readings
+        SET status = 'invalid'
+        WHERE status = 'valid'
+        AND (sg_calibrated < 0.500 OR sg_calibrated > 1.200)
+    """))
+    sg_count = result.rowcount
+
+    # Mark temperature outliers
+    result = conn.execute(text("""
+        UPDATE readings
+        SET status = 'invalid'
+        WHERE status = 'valid'
+        AND (temp_calibrated < 32.0 OR temp_calibrated > 212.0)
+    """))
+    temp_count = result.rowcount
+
+    total = sg_count + temp_count
+    if total > 0:
+        print(f"Migration: Marked {total} outlier readings as invalid ({sg_count} SG, {temp_count} temp)")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

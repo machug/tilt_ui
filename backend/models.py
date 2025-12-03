@@ -785,6 +785,92 @@ class RecipeResponse(BaseModel):
         return serialize_datetime_to_utc(dt)
 
 
+class FermentableResponse(BaseModel):
+    """Pydantic response model for fermentable ingredients."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    type: Optional[str] = None
+    amount_kg: Optional[float] = None
+    yield_percent: Optional[float] = None
+    color_lovibond: Optional[float] = None
+    origin: Optional[str] = None
+    supplier: Optional[str] = None
+
+
+class HopResponse(BaseModel):
+    """Pydantic response model for hop additions."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    alpha_percent: Optional[float] = None
+    amount_kg: Optional[float] = None
+    use: Optional[str] = None
+    time_min: Optional[float] = None
+    form: Optional[str] = None
+    type: Optional[str] = None
+
+
+class YeastResponse(BaseModel):
+    """Pydantic response model for yeast strains."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    lab: Optional[str] = None
+    product_id: Optional[str] = None
+    type: Optional[str] = None
+    attenuation_percent: Optional[float] = None
+    temp_min_c: Optional[float] = None
+    temp_max_c: Optional[float] = None
+    flocculation: Optional[str] = None
+
+
+class MiscResponse(BaseModel):
+    """Pydantic response model for misc ingredients."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    type: Optional[str] = None
+    use: Optional[str] = None
+    time_min: Optional[float] = None
+    amount_kg: Optional[float] = None
+    amount_is_weight: Optional[bool] = None
+
+
+class RecipeDetailResponse(BaseModel):
+    """Full recipe with all ingredients."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    author: Optional[str] = None
+    style_id: Optional[str] = None
+    type: Optional[str] = None
+    og_target: Optional[float] = None
+    fg_target: Optional[float] = None
+    ibu_target: Optional[float] = None
+    srm_target: Optional[float] = None
+    abv_target: Optional[float] = None
+    batch_size: Optional[float] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    style: Optional[StyleResponse] = None
+
+    # Ingredient lists
+    fermentables: list[FermentableResponse] = []
+    hops: list[HopResponse] = []
+    yeasts: list[YeastResponse] = []
+    miscs: list[MiscResponse] = []
+
+    @field_serializer('created_at')
+    def serialize_dt(self, dt: datetime) -> str:
+        return serialize_datetime_to_utc(dt)
+
+
 class BatchCreate(BaseModel):
     recipe_id: Optional[int] = None
     device_id: Optional[str] = None

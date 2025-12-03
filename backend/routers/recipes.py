@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Recipe, RecipeCreate, RecipeResponse
+from ..models import Recipe, RecipeCreate, RecipeResponse, RecipeDetailResponse
 from ..services.recipe_importer import import_beerxml_to_db
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -35,12 +35,18 @@ async def list_recipes(
     return result.scalars().all()
 
 
-@router.get("/{recipe_id}", response_model=RecipeResponse)
+@router.get("/{recipe_id}", response_model=RecipeDetailResponse)
 async def get_recipe(recipe_id: int, db: AsyncSession = Depends(get_db)):
-    """Get a specific recipe by ID."""
+    """Get a specific recipe by ID with all ingredients."""
     query = (
         select(Recipe)
-        .options(selectinload(Recipe.style))
+        .options(
+            selectinload(Recipe.style),
+            selectinload(Recipe.fermentables),
+            selectinload(Recipe.hops),
+            selectinload(Recipe.yeasts),
+            selectinload(Recipe.miscs),
+        )
         .where(Recipe.id == recipe_id)
     )
     result = await db.execute(query)

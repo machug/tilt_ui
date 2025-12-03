@@ -651,7 +651,7 @@
 	.content-grid {
 		display: grid;
 		grid-template-columns: 2fr 1fr;
-		gap: 1.5rem;
+		gap: 1rem;
 		align-items: start;
 	}
 
@@ -665,14 +665,14 @@
 	.stats-section {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	/* Info section */
 	.info-section {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	.info-card {

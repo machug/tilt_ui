@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { TiltReading } from '$lib/stores/tilts.svelte';
 	import { formatGravity, getGravityUnit, formatTemp, getTempUnit } from '$lib/stores/config.svelte';
-	import { getSignalStrength, timeSince } from '$lib/utils/signal';
+	import { timeSince } from '$lib/utils/signal';
 	import BatchCard from './BatchCard.svelte';
 
 	interface Props {
@@ -17,7 +17,6 @@
 	let displayTemp = $derived(liveReading?.temp ?? currentTemp);
 	let rawSg = $derived(liveReading?.sg_raw);
 	let rawTemp = $derived(liveReading?.temp_raw);
-	let rssi = $derived(liveReading?.rssi);
 	let lastSeen = $derived(liveReading?.last_seen);
 
 	// Show raw values if different from calibrated
@@ -39,7 +38,6 @@
 		return formatTemp(value);
 	}
 
-	let signal = $derived(rssi ? getSignalStrength(rssi) : null);
 	let lastSeenText = $derived(lastSeen ? timeSince(lastSeen) : null);
 </script>
 
@@ -80,27 +78,6 @@
 		</div>
 	{/if}
 
-	{#if signal && rssi}
-		<div class="signal-section">
-			<div class="signal-bars">
-				{#each Array(4) as _, i}
-					<div
-						class="signal-bar"
-						style="
-							height: {8 + i * 4}px;
-							background: {i < signal.bars ? signal.color : 'var(--bg-hover)'};
-							opacity: {i < signal.bars ? 1 : 0.4};
-						"
-					></div>
-				{/each}
-			</div>
-			<div class="signal-info">
-				<span class="signal-label" style="color: {signal.color}">{signal.label} Signal</span>
-				<span class="signal-rssi">{rssi} dBm</span>
-			</div>
-		</div>
-	{/if}
-
 	{#if lastSeenText}
 		<div class="last-seen">
 			Updated {lastSeenText}
@@ -113,7 +90,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.375rem;
-		margin-bottom: 1rem;
+		margin-bottom: 0.75rem;
 		padding: 0.25rem 0.625rem;
 		background: color-mix(in srgb, var(--recipe-accent) 12%, transparent);
 		border-radius: 9999px;
@@ -144,13 +121,13 @@
 	.readings-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		margin-bottom: 1rem;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
 	}
 
 	.reading {
 		text-align: center;
-		padding: 1rem;
+		padding: 0.75rem;
 		background: var(--bg-elevated);
 		border-radius: 0.5rem;
 	}
@@ -186,7 +163,7 @@
 		font-family: var(--font-mono);
 		font-size: 0.6875rem;
 		color: var(--text-muted);
-		margin-bottom: 1rem;
+		margin-bottom: 0.5rem;
 		padding: 0.5rem 0.75rem;
 		background: var(--bg-elevated);
 		border-radius: 0.375rem;
@@ -203,45 +180,6 @@
 	.raw-separator {
 		margin: 0 0.375rem;
 		opacity: 0.4;
-	}
-
-	.signal-section {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem;
-		background: var(--bg-elevated);
-		border-radius: 0.375rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.signal-bars {
-		display: flex;
-		align-items: flex-end;
-		gap: 0.25rem;
-	}
-
-	.signal-bar {
-		width: 4px;
-		border-radius: 2px;
-		transition: all 0.2s ease;
-	}
-
-	.signal-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-	}
-
-	.signal-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-	}
-
-	.signal-rssi {
-		font-family: var(--font-mono);
-		font-size: 0.6875rem;
-		color: var(--text-muted);
 	}
 
 	.last-seen {

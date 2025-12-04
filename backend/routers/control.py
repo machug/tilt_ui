@@ -17,7 +17,7 @@ from ..temp_controller import (
     set_manual_override,
     get_latest_tilt_temp,
     get_device_temp,
-    sync_cached_heater_state,
+    sync_cached_state,
 )
 from ..services.ha_client import get_ha_client, init_ha_client
 from .config import get_config_value
@@ -412,7 +412,7 @@ async def get_heater_state(
 
         # Keep controller cache aligned with the actual HA state
         if batch_id:
-            sync_cached_heater_state(heater_state, batch_id=batch_id)
+            sync_cached_state(heater_state, batch_id=batch_id, device_type="heater")
 
         return HeaterStateResponse(
             state=heater_state,
@@ -493,7 +493,7 @@ async def toggle_heater(request: HeaterToggleRequest, db: AsyncSession = Depends
         logger.info(f"Heater {heater_entity} manually toggled to {request.state}{batch_info}")
         # Keep controller cache aligned with manual toggles
         if request.batch_id:
-            sync_cached_heater_state(request.state, batch_id=request.batch_id)
+            sync_cached_state(request.state, batch_id=request.batch_id, device_type="heater")
         return HeaterToggleResponse(
             success=True,
             message=f"Heater turned {request.state}",

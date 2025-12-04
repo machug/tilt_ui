@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { BatchResponse, BatchCreate, BatchUpdate, RecipeResponse, BatchStatus, HeaterEntity } from '$lib/api';
-	import { fetchRecipes, fetchHeaterEntities } from '$lib/api';
+	import { fetchRecipes, fetchHeaterEntities, fetchCoolerEntities } from '$lib/api';
 	import { configState, getTempUnit, fahrenheitToCelsius, celsiusToFahrenheit } from '$lib/stores/config.svelte';
 	import { fetchAllDevices, type DeviceResponse } from '$lib/api/devices';
 	import RecipeSelector from './RecipeSelector.svelte';
@@ -28,6 +28,7 @@
 	// Temperature control fields
 	// Backend stores temps in F, convert for display based on user preference
 	let heaterEntityId = $state(batch?.heater_entity_id || '');
+	let coolerEntityId = $state(batch?.cooler_entity_id || '');
 
 	// Helper to convert backend F value to display value (F or C based on preference)
 	function tempToDisplay(tempF: number | null | undefined): string {
@@ -76,9 +77,11 @@
 
 	let recipes = $state<RecipeResponse[]>([]);
 	let heaterEntities = $state<HeaterEntity[]>([]);
+	let coolerEntities = $state<HeaterEntity[]>([]);
 	let availableDevices = $state<DeviceResponse[]>([]);
 	let loadingRecipes = $state(true);
 	let loadingHeaters = $state(false);
+	let loadingCoolers = $state(false);
 	let loadingDevices = $state(false);
 	let saving = $state(false);
 
@@ -142,6 +145,18 @@
 		}
 	}
 
+	async function loadCoolerEntities() {
+		if (!haEnabled) return;
+		loadingCoolers = true;
+		try {
+			coolerEntities = await fetchCoolerEntities();
+		} catch (e) {
+			console.error('Failed to load cooler entities:', e);
+		} finally {
+			loadingCoolers = false;
+		}
+	}
+
 	function handleRecipeSelect(recipe: RecipeResponse | null) {
 		selectedRecipe = recipe;
 		if (recipe) {
@@ -173,6 +188,7 @@
 				notes: notes || undefined,
 				// Temperature control - convert display values back to F for backend
 				heater_entity_id: heaterEntityId || undefined,
+				cooler_entity_id: coolerEntityId || undefined,
 				temp_target: displayToTempF(tempTarget),
 				temp_hysteresis: displayToTempDeltaF(tempHysteresis)
 			};
@@ -213,6 +229,13 @@
 		}
 	});
 
+	// Load cooler entities when HA becomes enabled
+	$effect(() => {
+		if (haEnabled && coolerEntities.length === 0 && !loadingCoolers) {
+			loadCoolerEntities();
+		}
+	});
+
 	// Auto-select recipe from query parameter
 	$effect(() => {
 		if (initialRecipeId && recipes.length > 0 && !selectedRecipe) {
@@ -237,6 +260,7 @@
 		loadRecipes();
 		loadDevices();
 		loadHeaterEntities();
+		loadCoolerEntities();
 	});
 </script>
 
@@ -375,7 +399,7 @@
 		{#if haEnabled}
 			<div class="form-section">
 				<h3 class="section-title">Temperature Control</h3>
-				<span class="section-hint">Link a heater switch from Home Assistant to control fermentation temperature</span>
+				<span class="section-hint">Link heater and/or cooler switches from Home Assistant to control fermentation temperature</span>
 			</div>
 
 			<div class="form-group">
@@ -402,7 +426,31 @@
 				{/if}
 			</div>
 
-			{#if heaterEntityId}
+			<div class="form-group">
+				<label class="form-label" for="coolerEntity">Cooler Switch</label>
+				<select
+					id="coolerEntity"
+					class="form-select"
+					bind:value={coolerEntityId}
+					disabled={loadingCoolers}
+				>
+					<option value="">No cooler assigned</option>
+					{#each coolerEntities as entity}
+						<option value={entity.entity_id}>
+							{entity.friendly_name} ({entity.state})
+						</option>
+					{/each}
+				</select>
+				{#if loadingCoolers}
+					<span class="form-hint">Loading available switches from Home Assistant...</span>
+				{:else if coolerEntities.length === 0}
+					<span class="form-hint">No switches found in Home Assistant</span>
+				{:else}
+					<span class="form-hint">Select a switch or input_boolean entity to control the cooler</span>
+				{/if}
+			</div>
+
+			{#if heaterEntityId || coolerEntityId}
 				<div class="form-row">
 					<div class="form-group">
 						<label class="form-label" for="tempTarget">Target Temperature ({tempUnit})</label>

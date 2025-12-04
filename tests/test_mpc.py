@@ -12,7 +12,7 @@ class TestMPCTemperatureController:
         controller = MPCTemperatureController()
 
         assert controller.horizon_hours == 4.0
-        assert controller.max_temp_rate == 1.0
+        assert controller.max_temp_rate == 0.56
         assert controller.dt_hours == 0.25
 
     def test_requires_system_model(self):
@@ -21,9 +21,9 @@ class TestMPCTemperatureController:
 
         # Try to control without model
         action = controller.compute_action(
-            current_temp=68.0,
-            target_temp=70.0,
-            ambient_temp=65.0
+            current_temp=20.0,
+            target_temp=21.1,
+            ambient_temp=18.3
         )
 
         assert action["heater_on"] is None
@@ -35,17 +35,17 @@ class TestMPCTemperatureController:
 
         # Learn simple thermal model (will use default parameters initially)
         controller.learn_thermal_model(
-            temp_history=[68.0, 68.5, 69.0, 69.3],
+            temp_history=[20.0, 20.3, 20.6, 20.7],
             time_history=[0, 0.25, 0.5, 0.75],
             heater_history=[True, True, True, False],
-            ambient_history=[65.0, 65.0, 65.0, 65.0]
+            ambient_history=[18.3, 18.3, 18.3, 18.3]
         )
 
-        # Compute action: need to heat from 68°F to 70°F
+        # Compute action: need to heat from 20°C to 21.1°C
         action = controller.compute_action(
-            current_temp=68.0,
-            target_temp=70.0,
-            ambient_temp=65.0
+            current_temp=20.0,
+            target_temp=21.1,
+            ambient_temp=18.3
         )
 
         assert action["heater_on"] in [True, False]  # Should make a decision
@@ -56,25 +56,25 @@ class TestMPCTemperatureController:
         """Controller prevents overshoot by turning off heater early."""
         controller = MPCTemperatureController(horizon_hours=2.0)
 
-        # Simple thermal model: heater adds ~2°F/hour, natural cooling -0.5°F/hour
+        # Simple thermal model: heater adds ~1.1°C/hour, natural cooling -0.3°C/hour
         controller.learn_thermal_model(
-            temp_history=[68.0, 70.0, 71.5, 70.8],
+            temp_history=[20.0, 21.1, 21.9, 21.6],
             time_history=[0, 1.0, 2.0, 3.0],
             heater_history=[True, True, False, False],
-            ambient_history=[65.0, 65.0, 65.0, 65.0]
+            ambient_history=[18.3, 18.3, 18.3, 18.3]
         )
 
-        # Approaching target: currently 69.5°F, target 70°F, heater currently ON
+        # Approaching target: currently 20.8°C, target 21.1°C, heater currently ON
         # MPC should turn heater OFF to prevent overshoot
         action = controller.compute_action(
-            current_temp=69.5,
-            target_temp=70.0,
-            ambient_temp=65.0,
+            current_temp=20.8,
+            target_temp=21.1,
+            ambient_temp=18.3,
             heater_currently_on=True
         )
 
-        # Should turn heater off or keep it off to avoid overshooting 70°F
-        # With 2°F/hour heat rate, 0.5°F remaining at current temp means ~15 min to target
+        # Should turn heater off or keep it off to avoid overshooting 21.1°C
+        # With 1.1°C/hour heat rate, 0.3°C remaining at current temp means ~15 min to target
         # Heater should be off or controller should predict safe action
         assert action["predicted_temp"] is not None
 
@@ -83,17 +83,17 @@ class TestMPCTemperatureController:
         controller = MPCTemperatureController()
 
         controller.learn_thermal_model(
-            temp_history=[70.0, 69.5, 69.0],
+            temp_history=[21.1, 20.8, 20.6],
             time_history=[0, 0.5, 1.0],
             heater_history=[False, False, False],
-            ambient_history=[65.0, 65.0, 65.0]
+            ambient_history=[18.3, 18.3, 18.3]
         )
 
         # Current temp above target: don't heat
         action = controller.compute_action(
-            current_temp=72.0,
-            target_temp=70.0,
-            ambient_temp=65.0
+            current_temp=22.2,
+            target_temp=21.1,
+            ambient_temp=18.3
         )
 
         assert action["heater_on"] is False
@@ -104,17 +104,17 @@ class TestMPCTemperatureController:
         controller = MPCTemperatureController(horizon_hours=4.0, dt_hours=1.0)
 
         controller.learn_thermal_model(
-            temp_history=[68.0, 69.0, 70.0],
+            temp_history=[20.0, 20.6, 21.1],
             time_history=[0, 1.0, 2.0],
             heater_history=[True, True, False],
-            ambient_history=[65.0, 65.0, 65.0]
+            ambient_history=[18.3, 18.3, 18.3]
         )
 
         # Get predicted trajectory
         trajectory = controller.predict_trajectory(
-            initial_temp=68.0,
+            initial_temp=20.0,
             heater_sequence=[True, True, False, False],  # 4 time steps
-            ambient_temp=65.0
+            ambient_temp=18.3
         )
 
         assert len(trajectory) == 4

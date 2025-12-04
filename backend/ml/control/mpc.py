@@ -34,14 +34,14 @@ class MPCTemperatureController:
     def __init__(
         self,
         horizon_hours: float = 4.0,
-        max_temp_rate: float = 1.0,  # Max °F/hour change
+        max_temp_rate: float = 0.56,  # Max °C/hour change (~1°F/hour equivalent)
         dt_hours: float = 0.25,  # 15-minute time steps
     ):
         """Initialize the MPC controller.
 
         Args:
             horizon_hours: Prediction horizon in hours
-            max_temp_rate: Maximum allowed temperature change rate (°F/hour)
+            max_temp_rate: Maximum allowed temperature change rate (°C/hour)
             dt_hours: Time step for prediction (hours)
         """
         self.horizon_hours = horizon_hours
@@ -49,7 +49,7 @@ class MPCTemperatureController:
         self.dt_hours = dt_hours
 
         # Thermal model parameters (learned from data)
-        self.heating_rate: Optional[float] = None  # °F/hour when heater ON
+        self.heating_rate: Optional[float] = None  # °C/hour when heater ON
         self.cooling_coeff: Optional[float] = None  # Cooling coefficient
         self.has_model = False
 
@@ -63,10 +63,10 @@ class MPCTemperatureController:
         """Learn thermal model parameters from historical data.
 
         Args:
-            temp_history: Temperature readings (°F)
+            temp_history: Temperature readings (°C)
             time_history: Time stamps (hours)
             heater_history: Heater state (True=ON, False=OFF)
-            ambient_history: Ambient temperature (°F)
+            ambient_history: Ambient temperature (°C)
 
         Returns:
             Dictionary with learned parameters and fit quality
@@ -103,7 +103,7 @@ class MPCTemperatureController:
                 continue
 
             dtemp = temp_history[i] - temp_history[i - 1]
-            rate = dtemp / dt  # °F/hour
+            rate = dtemp / dt  # °C/hour
 
             # Temperature difference from ambient
             temp_above_ambient = temp_history[i - 1] - ambient_history[i - 1]
@@ -141,7 +141,7 @@ class MPCTemperatureController:
 
             self.heating_rate = float(np.median(net_heating_rates))
         else:
-            self.heating_rate = 2.0  # Default fallback (2°F/hour)
+            self.heating_rate = 1.1  # Default fallback (1.1°C/hour, ~2°F/hour equivalent)
 
         self.has_model = True
 
@@ -162,9 +162,9 @@ class MPCTemperatureController:
         """Compute optimal heater action using MPC.
 
         Args:
-            current_temp: Current fermentation temperature (°F)
-            target_temp: Target temperature (°F)
-            ambient_temp: Ambient/room temperature (°F)
+            current_temp: Current fermentation temperature (°C)
+            target_temp: Target temperature (°C)
+            ambient_temp: Ambient/room temperature (°C)
             heater_currently_on: Current heater state (for continuity preference)
 
         Returns:
@@ -254,9 +254,9 @@ class MPCTemperatureController:
         """Predict temperature trajectory given heater sequence.
 
         Args:
-            initial_temp: Starting temperature (°F)
+            initial_temp: Starting temperature (°C)
             heater_sequence: Sequence of heater states over horizon
-            ambient_temp: Ambient temperature (°F)
+            ambient_temp: Ambient temperature (°C)
 
         Returns:
             List of predicted temperatures at each time step

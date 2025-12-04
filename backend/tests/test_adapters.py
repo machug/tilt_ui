@@ -1,7 +1,6 @@
 # backend/tests/test_adapters.py
 """Tests for device format adapters."""
 
-from datetime import datetime, timezone
 
 import pytest
 from backend.ingest.adapters.gravitymon import GravityMonAdapter

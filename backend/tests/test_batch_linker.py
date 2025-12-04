@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from backend.models import Batch, Device, Reading
+from backend.models import Batch, Device
 
 
 @pytest.mark.asyncio

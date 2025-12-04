@@ -15,7 +15,6 @@ from ..temp_controller import (
     get_control_status,
     get_batch_control_status,
     set_manual_override,
-    get_latest_tilt_temp,
     get_device_temp,
     sync_cached_state,
 )

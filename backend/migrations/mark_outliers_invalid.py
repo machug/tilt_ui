@@ -11,7 +11,7 @@ Valid ranges:
 import asyncio
 import logging
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from backend.database import async_session_factory
 from backend.models import Reading

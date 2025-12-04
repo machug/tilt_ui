@@ -15,7 +15,6 @@ from ..models import (
     BatchProgressResponse,
     BatchResponse,
     BatchUpdate,
-    Reading,
     Recipe,
 )
 from ..state import latest_readings

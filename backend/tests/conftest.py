@@ -15,8 +15,8 @@ backend_path = Path(__file__).parent.parent.parent
 if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
-from backend.database import Base
-from backend.main import app
+from backend.database import Base  # noqa: E402
+from backend.main import app  # noqa: E402
 
 
 # Test database URL (in-memory SQLite)

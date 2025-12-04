@@ -37,7 +37,7 @@ class TiltAdapter(BaseAdapter):
         sg = payload.get("sg")
         temp_f = payload.get("temp_f")
         rssi = payload.get("rssi")
-        mac = payload.get("mac")
+        _mac = payload.get("mac")  # Extracted but not used (available in raw_payload)
 
         # Determine status
         if sg is None and temp_f is None:

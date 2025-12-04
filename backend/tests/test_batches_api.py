@@ -291,7 +291,7 @@ async def test_heater_entity_conflict_on_update(client):
     }
     response1 = await client.post("/api/batches", json=batch1_data)
     assert response1.status_code == 201
-    batch1_id = response1.json()["id"]
+    _batch1_id = response1.json()["id"]  # Created but not used in test
 
     batch2_data = {
         "status": "fermenting",

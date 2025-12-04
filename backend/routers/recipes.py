@@ -1,6 +1,5 @@
 """Recipe API endpoints."""
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select

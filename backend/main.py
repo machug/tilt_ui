@@ -8,26 +8,27 @@ from typing import Optional
 # Configure logging to show INFO level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select, desc
+# Imports after logging configuration
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from sqlalchemy import select, desc  # noqa: E402
 
-from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
-from .database import async_session_factory, init_db
-from .models import Reading, Tilt, serialize_datetime_to_utc
-from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, maintenance, recipes, system, tilts
-from .routers.config import get_config_value
-from .ambient_poller import start_ambient_poller, stop_ambient_poller
-from .temp_controller import start_temp_controller, stop_temp_controller
-from .cleanup import CleanupService
-from .scanner import TiltReading, TiltScanner
-from .services.calibration import calibration_service
-from .services.batch_linker import link_reading_to_batch
-from .services.smoothing import smoothing_service
-from .state import latest_readings
-from .websocket import manager
-import time
+from . import models  # noqa: E402, F401 - Import models so SQLAlchemy sees them
+from .database import async_session_factory, init_db  # noqa: E402
+from .models import Reading, Tilt, serialize_datetime_to_utc  # noqa: E402
+from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, maintenance, recipes, system, tilts  # noqa: E402
+from .routers.config import get_config_value  # noqa: E402
+from .ambient_poller import start_ambient_poller, stop_ambient_poller  # noqa: E402
+from .temp_controller import start_temp_controller, stop_temp_controller  # noqa: E402
+from .cleanup import CleanupService  # noqa: E402
+from .scanner import TiltReading, TiltScanner  # noqa: E402
+from .services.calibration import calibration_service  # noqa: E402
+from .services.batch_linker import link_reading_to_batch  # noqa: E402
+from .services.smoothing import smoothing_service  # noqa: E402
+from .state import latest_readings  # noqa: E402
+from .websocket import manager  # noqa: E402
+import time  # noqa: E402
 
 # Global scanner instance
 scanner: Optional[TiltScanner] = None
@@ -191,7 +192,7 @@ async def lifespan(app: FastAPI):
     print("Scanner stopped")
 
 
-from .routers.system import VERSION
+from .routers.system import VERSION  # noqa: E402
 app = FastAPI(title="BrewSignal", version=VERSION, lifespan=lifespan)
 
 # Register routers

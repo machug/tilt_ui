@@ -1,4 +1,3 @@
-import pytest
 from backend.services.beerxml_parser import parse_beerxml
 
 

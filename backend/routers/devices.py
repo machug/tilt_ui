@@ -1,7 +1,7 @@
 """Device API endpoints for universal hydrometer device registry."""
 
 from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -53,7 +53,7 @@ class DeviceCreate(BaseModel):
     def validate_temp_unit(cls, v: str) -> str:
         valid_units = {"f", "c"}
         if v not in valid_units:
-            raise ValueError(f"native_temp_unit must be 'f' or 'c'")
+            raise ValueError("native_temp_unit must be 'f' or 'c'")
         return v
 
     @field_validator("original_gravity")
@@ -255,7 +255,7 @@ async def list_devices(
         query = query.where(Device.device_type == device_type)
 
     if paired_only:
-        query = query.where(Device.paired == True)
+        query = query.where(Device.paired)
 
     result = await db.execute(query)
     devices = result.scalars().all()

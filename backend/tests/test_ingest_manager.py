@@ -1,7 +1,6 @@
 """Tests for IngestManager device auto-registration."""
 
 import pytest
-from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -169,7 +168,7 @@ class TestIngestManagerAutoRegistration:
         result = await test_db.execute(select(Device).where(Device.id == "BLUE"))
         device1 = result.scalar_one_or_none()
         assert device1 is not None
-        first_seen = device1.last_seen
+        _first_seen = device1.last_seen  # Extracted but not used in test
 
         # Count devices
         result = await test_db.execute(select(Device))

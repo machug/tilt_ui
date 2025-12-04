@@ -4,7 +4,6 @@ import pytest
 from backend.ingest.base import (
     GravityUnit,
     HydrometerReading,
-    ReadingStatus,
     TemperatureUnit,
 )
 from backend.services.calibration import CalibrationService

@@ -1,7 +1,7 @@
 """Weather alerts and predictive alerts API endpoints."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends

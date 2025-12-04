@@ -1,7 +1,6 @@
 """Tests for recipe and batch models."""
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 
 from backend.models import Style, Recipe, Batch

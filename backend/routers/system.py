@@ -5,10 +5,9 @@ Safety: Destructive operations (reboot/shutdown) require:
 2. Explicit confirmation in request body
 """
 
-import os
 import socket
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 

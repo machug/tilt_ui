@@ -1,6 +1,5 @@
 """Tests for parsing yeasts and misc ingredients from BeerXML."""
 
-import pytest
 from backend.services.beerxml_parser import parse_beerxml
 
 

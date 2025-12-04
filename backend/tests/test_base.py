@@ -3,7 +3,6 @@
 
 from datetime import datetime, timezone
 
-import pytest
 from backend.ingest.base import (
     GravityUnit,
     HydrometerReading,

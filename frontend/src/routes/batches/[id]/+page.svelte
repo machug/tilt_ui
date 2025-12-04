@@ -27,6 +27,8 @@
 	let isEditing = $state(false);
 	let statusUpdating = $state(false);
 	let heaterLoading = $state(false);
+	let showDeleteConfirm = $state(false);
+	let deleting = $state(false);
 
 	let batchId = $derived(parseInt($page.params.id ?? '0'));
 
@@ -129,12 +131,15 @@
 
 	async function handleDelete() {
 		if (!batch) return;
-		if (!confirm(`Are you sure you want to delete "${batch.name || 'this batch'}"?`)) return;
+
+		deleting = true;
 		try {
 			await deleteBatch(batch.id);
 			goto('/batches');
 		} catch (e) {
-			alert('Failed to delete batch');
+			error = e instanceof Error ? e.message : 'Failed to delete batch';
+			deleting = false;
+			showDeleteConfirm = false;
 		}
 	}
 
@@ -341,7 +346,7 @@
 					</svg>
 					Edit
 				</button>
-				<button type="button" class="delete-btn" onclick={handleDelete} aria-label="Delete batch">
+				<button type="button" class="delete-btn" onclick={() => (showDeleteConfirm = true)} aria-label="Delete batch">
 					<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 					</svg>
@@ -530,6 +535,30 @@
 		</div>
 	{/if}
 </div>
+
+{#if showDeleteConfirm}
+	<div class="modal-overlay" onclick={() => (showDeleteConfirm = false)}>
+		<div class="modal" onclick={(e) => e.stopPropagation()}>
+			<h2 class="modal-title">Delete Batch?</h2>
+			<p class="modal-text">
+				Are you sure you want to delete "{batch?.name || 'this batch'}"? This cannot be undone.
+			</p>
+			<div class="modal-actions">
+				<button
+					type="button"
+					class="modal-btn cancel"
+					onclick={() => (showDeleteConfirm = false)}
+					disabled={deleting}
+				>
+					Cancel
+				</button>
+				<button type="button" class="modal-btn delete" onclick={handleDelete} disabled={deleting}>
+					{deleting ? 'Deleting...' : 'Delete Batch'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.page-container {
@@ -1044,5 +1073,79 @@
 			width: 100%;
 			justify-content: flex-start;
 		}
+	}
+
+	/* Modal styles */
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.modal {
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		border-radius: 8px;
+		padding: var(--space-6);
+		max-width: 400px;
+		width: 90%;
+	}
+
+	.modal-title {
+		font-size: 20px;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-3) 0;
+	}
+
+	.modal-text {
+		font-size: 14px;
+		color: var(--text-secondary);
+		line-height: 1.5;
+		margin: 0 0 var(--space-6) 0;
+	}
+
+	.modal-actions {
+		display: flex;
+		gap: var(--space-3);
+		justify-content: flex-end;
+	}
+
+	.modal-btn {
+		padding: var(--space-2) var(--space-4);
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all var(--transition);
+	}
+
+	.modal-btn.cancel {
+		background: transparent;
+		border: 1px solid var(--border-default);
+		color: var(--text-primary);
+	}
+
+	.modal-btn.cancel:hover {
+		background: var(--bg-hover);
+	}
+
+	.modal-btn.delete {
+		background: var(--negative);
+		border: none;
+		color: white;
+	}
+
+	.modal-btn.delete:hover {
+		background: #dc2626;
+	}
+
+	.modal-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

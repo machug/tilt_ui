@@ -120,14 +120,15 @@
 	}
 
 	async function handleDelete(batchId: number, batchName: string) {
-		const confirmMessage = activeTab === 'deleted'
+		const isHardDelete = activeTab === 'deleted';
+		const confirmMessage = isHardDelete
 			? 'This will permanently delete this batch. This cannot be undone. Are you sure?'
 			: `Soft delete "${batchName}"? You can restore it later from the Deleted tab.`;
 
 		if (!confirm(confirmMessage)) return;
 
 		try {
-			await deleteBatch(batchId);
+			await deleteBatch(batchId, isHardDelete);
 			showNotification('Batch deleted successfully', 'success');
 			await loadBatches();
 		} catch (e) {

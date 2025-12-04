@@ -356,7 +356,10 @@ class Batch(Base):
     # Relationships
     recipe: Mapped[Optional["Recipe"]] = relationship(back_populates="batches")
     device: Mapped[Optional["Device"]] = relationship()
-    readings: Mapped[list["Reading"]] = relationship(back_populates="batch")
+    readings: Mapped[list["Reading"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan"
+    )
 
     @property
     def is_deleted(self) -> bool:

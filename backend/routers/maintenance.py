@@ -1,10 +1,8 @@
 """Maintenance API endpoints for orphaned data cleanup."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -45,25 +43,23 @@ async def get_orphaned_data(db: AsyncSession = Depends(get_db)):
     Returns:
         OrphanedDataReport with counts and details of orphaned readings
     """
-    # Find all soft-deleted batches (deleted_at is not None)
-    deleted_batches_query = select(Batch.id).where(Batch.deleted_at.is_not(None))
-    deleted_batches_result = await db.execute(deleted_batches_query)
-    deleted_batch_ids = [row[0] for row in deleted_batches_result.all()]
+    # Use JOIN instead of IN for better performance
+    # Find all readings linked to soft-deleted batches in a single query
+    orphaned_readings_query = (
+        select(Reading.id, Reading.batch_id)
+        .join(Batch, Reading.batch_id == Batch.id)
+        .where(Batch.deleted_at.is_not(None))
+    )
+    orphaned_readings_result = await db.execute(orphaned_readings_query)
+    orphaned_readings_rows = orphaned_readings_result.all()
 
-    if not deleted_batch_ids:
-        # No deleted batches, no orphaned readings
+    if not orphaned_readings_rows:
+        # No orphaned readings found
         return OrphanedDataReport(
             orphaned_readings_count=0,
             orphaned_readings=[],
             batches_with_orphans={},
         )
-
-    # Find all readings linked to these deleted batches
-    orphaned_readings_query = select(Reading.id, Reading.batch_id).where(
-        Reading.batch_id.in_(deleted_batch_ids)
-    )
-    orphaned_readings_result = await db.execute(orphaned_readings_query)
-    orphaned_readings_rows = orphaned_readings_result.all()
 
     # Build response
     orphaned_reading_ids = [row[0] for row in orphaned_readings_rows]

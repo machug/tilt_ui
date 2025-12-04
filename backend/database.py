@@ -66,6 +66,7 @@ async def init_db():
         await conn.run_sync(_migrate_add_batch_id_to_control_events)  # Add batch_id to control_events
         await conn.run_sync(_migrate_add_paired_to_tilts_and_devices)  # Add paired field
         await conn.run_sync(_migrate_add_deleted_at)  # Add soft delete support to batches
+        await conn.run_sync(_migrate_add_deleted_at_index)  # Add index on deleted_at column
 
         # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
@@ -720,6 +721,26 @@ def _migrate_add_deleted_at(conn):
         print("Migration: deleted_at column added successfully")
     else:
         print("Migration: deleted_at column already exists, skipping")
+
+
+def _migrate_add_deleted_at_index(conn):
+    """Add index on deleted_at column for better query performance."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(conn)
+
+    if "batches" not in inspector.get_table_names():
+        return  # Fresh install, create_all will handle it
+
+    # Check if index already exists
+    indexes = inspector.get_indexes("batches")
+    index_names = [idx["name"] for idx in indexes]
+
+    if "ix_batches_deleted_at" not in index_names:
+        print("Migration: Adding index on deleted_at column")
+        conn.execute(text("CREATE INDEX ix_batches_deleted_at ON batches (deleted_at)"))
+        print("Migration: deleted_at index added successfully")
+    else:
+        print("Migration: deleted_at index already exists, skipping")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

@@ -434,11 +434,9 @@ export async function updateBatch(batchId: number, update: BatchUpdate): Promise
  * Delete a batch (soft delete by default, hard delete optional)
  */
 export async function deleteBatch(batchId: number, hardDelete: boolean = false): Promise<void> {
-	const url = new URL(`${BASE_URL}/batches/${batchId}/delete`);
-	if (hardDelete) {
-		url.searchParams.set('hard_delete', 'true');
-	}
-	const response = await fetch(url.toString(), {
+	const url = `${BASE_URL}/batches/${batchId}/delete`;
+	const urlWithParams = hardDelete ? `${url}?hard_delete=true` : url;
+	const response = await fetch(urlWithParams, {
 		method: 'POST'
 	});
 	if (!response.ok) {

@@ -44,8 +44,10 @@ class BatchControlStatusResponse(BaseModel):
     enabled: bool
     heater_state: Optional[str]
     heater_entity: Optional[str]
+    cooler_state: Optional[str]  # NEW: Cooler state ("on", "off", or None)
+    cooler_entity: Optional[str]  # NEW: Cooler entity ID
     override_active: bool
-    override_state: Optional[str]
+    override_state: Optional[str]  # Deprecated - kept for backward compatibility
     override_until: Optional[str]
     target_temp: Optional[float]
     hysteresis: Optional[float]
@@ -172,9 +174,11 @@ async def get_batch_status(batch_id: int, db: AsyncSession = Depends(get_db)):
 
     return BatchControlStatusResponse(
         batch_id=batch_id,
-        enabled=temp_control_enabled and batch.heater_entity_id is not None,
+        enabled=temp_control_enabled and (batch.heater_entity_id is not None or batch.cooler_entity_id is not None),
         heater_state=batch_status["heater_state"],
         heater_entity=batch.heater_entity_id,
+        cooler_state=batch_status["cooler_state"],
+        cooler_entity=batch.cooler_entity_id,
         override_active=batch_status["override_active"],
         override_state=batch_status["override_state"],
         override_until=batch_status["override_until"],

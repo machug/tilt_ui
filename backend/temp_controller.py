@@ -584,31 +584,53 @@ def get_batch_control_status(batch_id: int) -> dict:
     Returns state_available=True if runtime state exists for this batch,
     False if state was cleaned up (e.g., batch completed/archived).
     """
-    batch_state = _batch_heater_states.get(batch_id)
+    heater_state = _batch_heater_states.get(batch_id)
+    cooler_state = _batch_cooler_states.get(batch_id)
     override = _batch_overrides.get(batch_id)
 
     # state_available indicates whether runtime state exists for this batch
     # False means state was cleaned up (batch no longer fermenting) or never existed
-    state_available = batch_state is not None
+    state_available = heater_state is not None or cooler_state is not None
+
+    # For backward compatibility, keep override_state (deprecated)
+    # It will return heater override state if present, otherwise cooler override state
+    legacy_override_state = None
+    if override:
+        if override.get("heater"):
+            legacy_override_state = override["heater"].get("state")
+        elif override.get("cooler"):
+            legacy_override_state = override["cooler"].get("state")
 
     return {
         "batch_id": batch_id,
-        "heater_state": batch_state.get("state") if batch_state else None,
-        "heater_entity": batch_state.get("entity_id") if batch_state else None,
+        "enabled": True,  # Batch-level control is always enabled if state exists
+        "heater_state": heater_state.get("state") if heater_state else None,
+        "heater_entity": heater_state.get("entity_id") if heater_state else None,
+        "cooler_state": cooler_state.get("state") if cooler_state else None,
+        "cooler_entity": cooler_state.get("entity_id") if cooler_state else None,
         "override_active": override is not None,
-        "override_state": override.get("state") if override else None,
-        "override_until": serialize_datetime_to_utc(override.get("until")) if override and override.get("until") else None,
+        "override_state": legacy_override_state,  # Deprecated - kept for backward compat
+        "override_until": serialize_datetime_to_utc(override.get("heater", {}).get("until") or override.get("cooler", {}).get("until")) if override else None,
+        "target_temp": None,  # Would need to query DB for batch.temp_target
+        "hysteresis": None,  # Would need to query DB for batch.temp_hysteresis
+        "wort_temp": None,  # Would need to get from latest_readings
         "state_available": state_available,
     }
 
 
-def set_manual_override(state: Optional[str], duration_minutes: int = 60, batch_id: Optional[int] = None) -> bool:
-    """Set manual override for heater control.
+def set_manual_override(
+    state: Optional[str],
+    duration_minutes: int = 60,
+    batch_id: Optional[int] = None,
+    device_type: str = "heater"
+) -> bool:
+    """Set manual override for heater or cooler control.
 
     Args:
         state: "on", "off", or None to cancel override
         duration_minutes: How long override lasts (default 60 min)
         batch_id: If provided, override for specific batch; otherwise legacy global override
+        device_type: "heater" or "cooler" - which device to override
 
     Returns:
         True if override was set/cleared successfully
@@ -617,34 +639,61 @@ def set_manual_override(state: Optional[str], duration_minutes: int = 60, batch_
 
     if batch_id is None:
         # Legacy global override - no longer supported for multi-batch
-        logger.warning("Global heater override not supported in multi-batch mode. Use batch_id parameter.")
+        logger.warning("Global override not supported in multi-batch mode. Use batch_id parameter.")
+        return False
+
+    if device_type not in ("heater", "cooler"):
+        logger.error(f"Invalid device_type: {device_type}. Must be 'heater' or 'cooler'.")
         return False
 
     if state is None:
-        # Cancel override for batch
-        if batch_id in _batch_overrides:
-            del _batch_overrides[batch_id]
-        logger.info(f"Batch {batch_id}: Manual override cancelled, returning to auto mode")
+        # Cancel override for specific device type
+        if batch_id in _batch_overrides and device_type in _batch_overrides[batch_id]:
+            del _batch_overrides[batch_id][device_type]
+            # Clean up batch entry if no overrides remain
+            if not _batch_overrides[batch_id]:
+                del _batch_overrides[batch_id]
+        logger.info(f"Batch {batch_id}: Manual override cancelled for {device_type}, returning to auto mode")
         _trigger_immediate_check()
         return True
 
     if state not in ("on", "off"):
         return False
 
-    _batch_overrides[batch_id] = {
+    # Initialize nested structure if needed
+    if batch_id not in _batch_overrides:
+        _batch_overrides[batch_id] = {}
+
+    _batch_overrides[batch_id][device_type] = {
         "state": state,
         "until": datetime.now(timezone.utc) + timedelta(minutes=duration_minutes) if duration_minutes > 0 else None,
     }
-    logger.info(f"Batch {batch_id}: Manual override set: heater {state} for {duration_minutes} minutes")
+    logger.info(f"Batch {batch_id}: Manual override set: {device_type} {state} for {duration_minutes} minutes")
     _trigger_immediate_check()
     return True
 
 
-def sync_cached_heater_state(state: Optional[str], batch_id: Optional[int] = None) -> None:
-    """Keep the in-memory heater state in sync with external changes (e.g., manual HA toggles)."""
-    global _batch_heater_states
+def sync_cached_state(state: Optional[str], batch_id: Optional[int] = None, device_type: str = "heater") -> None:
+    """Keep the in-memory device state in sync with external changes (e.g., manual HA toggles).
+
+    Args:
+        state: "on", "off", or None
+        batch_id: The batch ID to sync state for
+        device_type: "heater" or "cooler" - which device to sync
+    """
+    global _batch_heater_states, _batch_cooler_states
+
     if state in ("on", "off", None) and batch_id is not None:
-        _batch_heater_states.setdefault(batch_id, {})["state"] = state
+        if device_type == "heater":
+            _batch_heater_states.setdefault(batch_id, {})["state"] = state
+        elif device_type == "cooler":
+            _batch_cooler_states.setdefault(batch_id, {})["state"] = state
+
+
+# Backward compatibility alias
+def sync_cached_heater_state(state: Optional[str], batch_id: Optional[int] = None) -> None:
+    """Legacy function - use sync_cached_state instead."""
+    sync_cached_state(state, batch_id, device_type="heater")
 
 
 def start_temp_controller() -> None:

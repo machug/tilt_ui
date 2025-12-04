@@ -893,6 +893,7 @@ class BatchCreate(BaseModel):
     notes: Optional[str] = None
     # Temperature control
     heater_entity_id: Optional[str] = None
+    cooler_entity_id: Optional[str] = None
     temp_target: Optional[float] = None
     temp_hysteresis: Optional[float] = None
 
@@ -904,11 +905,11 @@ class BatchCreate(BaseModel):
             raise ValueError(f"status must be one of: {', '.join(valid)}")
         return v
 
-    @field_validator("heater_entity_id")
+    @field_validator("heater_entity_id", "cooler_entity_id")
     @classmethod
-    def validate_heater_entity(cls, v: Optional[str]) -> Optional[str]:
+    def validate_entity(cls, v: Optional[str]) -> Optional[str]:
         if v and not v.startswith(("switch.", "input_boolean.")):
-            raise ValueError("heater_entity_id must be a valid HA entity (e.g., switch.heater_1 or input_boolean.heater_1)")
+            raise ValueError("entity_id must be a valid HA entity (e.g., switch.heater_1 or input_boolean.heater_1)")
         return v
 
     @field_validator("temp_target")
@@ -941,6 +942,7 @@ class BatchUpdate(BaseModel):
     notes: Optional[str] = None
     # Temperature control
     heater_entity_id: Optional[str] = None
+    cooler_entity_id: Optional[str] = None
     temp_target: Optional[float] = None
     temp_hysteresis: Optional[float] = None
 
@@ -954,11 +956,11 @@ class BatchUpdate(BaseModel):
             raise ValueError(f"status must be one of: {', '.join(valid)}")
         return v
 
-    @field_validator("heater_entity_id")
+    @field_validator("heater_entity_id", "cooler_entity_id")
     @classmethod
-    def validate_heater_entity(cls, v: Optional[str]) -> Optional[str]:
+    def validate_entity(cls, v: Optional[str]) -> Optional[str]:
         if v and not v.startswith(("switch.", "input_boolean.")):
-            raise ValueError("heater_entity_id must be a valid HA entity (e.g., switch.heater_1 or input_boolean.heater_1)")
+            raise ValueError("entity_id must be a valid HA entity (e.g., switch.heater_1 or input_boolean.heater_1)")
         return v
 
     @field_validator("temp_target")
@@ -1000,6 +1002,7 @@ class BatchResponse(BaseModel):
     recipe: Optional[RecipeResponse] = None
     # Temperature control
     heater_entity_id: Optional[str] = None
+    cooler_entity_id: Optional[str] = None
     temp_target: Optional[float] = None
     temp_hysteresis: Optional[float] = None
 

@@ -1,6 +1,6 @@
 # BrewSignal
 
-![CI](https://github.com/machug/brewsignal/actions/workflows/ci.yml/badge.svg) ![Version](https://img.shields.io/badge/version-2.4.0-blue) ![Python](https://img.shields.io/badge/python-3.11+-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/machug/brewsignal/actions/workflows/ci.yml/badge.svg) ![Version](https://img.shields.io/badge/version-2.5.0-blue) ![Python](https://img.shields.io/badge/python-3.11+-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 A modern web interface for monitoring fermentation hydrometers on Raspberry Pi. Supports Tilt, iSpindel, and GravityMon devices.
 
@@ -26,6 +26,12 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8080
 - **RSSI Filtering** - Filter weak Bluetooth signals to reduce noise from distant devices
 - **Reading Smoothing** (v2.4.0) - Configurable moving average filter to reduce sensor noise
 - **Outlier Validation** (v2.4.0) - Physical impossibility checks reject invalid readings
+- **Machine Learning Pipeline** (v2.5.0) - Advanced predictive fermentation analytics
+  - **Kalman Filtering** - Optimal noise reduction for SG/temp/RSSI measurements
+  - **Anomaly Detection** - Automatic stuck fermentation and temperature spike detection
+  - **Curve Fitting** - Exponential decay model predicts final gravity and completion time
+  - **Model Predictive Control** - Intelligent heater control with overshoot prevention
+  - **Per-Device State Isolation** - Separate ML pipelines prevent cross-contamination
 - **Home Assistant Integration** - Display ambient temperature/humidity from HA sensors
 - **Dual-Mode Temperature Control** (v2.4.0) - Independent heater AND cooler control per batch
   - Heating-only, cooling-only, or full dual-mode operation
@@ -50,6 +56,114 @@ Tilt devices must be **paired** before readings are logged. This prevents data p
 - Navigate to **Devices** page to pair/unpair devices
 - Only paired devices log readings and can be assigned to batches
 - Unpaired devices still appear on dashboard with live readings
+
+## Machine Learning Pipeline (v2.5.0)
+
+BrewSignal includes an advanced ML pipeline for predictive fermentation analytics. Each Tilt maintains isolated state to prevent cross-contamination.
+
+### Components
+
+**Kalman Filtering** - Optimal state estimation for noisy sensor data
+- Extended Kalman Filter (EKF) tracks SG, temperature, and RSSI
+- Adaptive process noise scaling based on measurement intervals
+- Provides filtered values and velocity/acceleration estimates
+
+**Anomaly Detection** - Rule-based detection of fermentation issues
+- Stuck fermentation (no SG change over 24+ hours)
+- Temperature spikes (>5°F increase in <1 hour)
+- Signal drops (RSSI below -90 dBm)
+- Early warning system for intervention
+
+**Curve Fitting** - Exponential decay model for predictions
+- Predicts final gravity (FG) from historical SG trajectory
+- Estimates hours remaining until fermentation completes
+- Automatic model retraining as data accumulates
+
+**Model Predictive Control (MPC)** - Intelligent temperature control
+- Learns thermal model from heating/cooling data
+- Predicts temperature trajectory over 2-hour horizon
+- Computes optimal heater action with 10x overshoot penalty
+- Prevents temperature swings and wasted energy
+
+### Configuration
+
+```python
+from backend.ml.config import MLConfig
+from backend.ml.pipeline_manager import MLPipelineManager
+
+# Configure ML components (all enabled by default)
+config = MLConfig(
+    enable_kalman_filter=True,
+    enable_anomaly_detection=True,
+    enable_predictions=True,
+    enable_mpc=True,
+)
+
+# Create pipeline manager (one instance per device)
+manager = MLPipelineManager(config=config)
+
+# Process a reading
+result = manager.process_reading(
+    device_id="RED",
+    sg=1.050,
+    temp=68.0,
+    rssi=-60,
+    time_hours=24.0,
+    ambient_temp=65.0,
+    heater_on=True,
+    target_temp=70.0,
+)
+
+# Result structure:
+# {
+#   "kalman": {
+#     "sg_filtered": 1.0498,
+#     "temp_filtered": 68.1,
+#     "rssi_filtered": -60.2,
+#     "sg_velocity": -0.002,  # SG/hour
+#   },
+#   "anomaly": {
+#     "is_anomaly": False,
+#     "reason": None,
+#   },
+#   "predictions": {
+#     "fitted": True,
+#     "predicted_fg": 1.012,
+#     "hours_remaining": 72.5,
+#   },
+#   "mpc": {
+#     "heater_on": True,
+#     "predicted_temp": 69.8,
+#     "has_model": True,
+#   }
+# }
+```
+
+### Dependencies
+
+ML features require additional packages (installed automatically with `pip install -e '.[dev]'`):
+- `numpy` - Numerical computing
+- `filterpy` - Kalman filter implementation
+- `scipy` - Optimization and curve fitting
+- `scikit-learn` - Machine learning utilities
+
+### Validation
+
+Validate ML pipeline on Raspberry Pi:
+
+```bash
+ssh pi@192.168.4.218
+cd /opt/brewsignal
+source .venv/bin/activate
+
+# Run validation script
+python validate_ml_isolation.py
+
+# Check service logs
+sudo journalctl -u brewsignal -n 100 --no-pager | grep -E "(ML|Kalman|MPC)"
+```
+
+See `ML_VALIDATION_GUIDE.md` for comprehensive validation procedures.
 
 ## Requirements
 

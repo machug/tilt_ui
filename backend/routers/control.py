@@ -245,24 +245,37 @@ async def get_events(
 
 @router.post("/override", response_model=OverrideResponse)
 async def set_override(request: OverrideRequest, db: AsyncSession = Depends(get_db)):
-    """Set or cancel manual heater override.
+    """Set or cancel manual heater or cooler override.
 
-    - state: "on" to force heater on, "off" to force heater off, null to cancel override
+    Each device type (heater/cooler) has independent override state.
+    - device_type: "heater" or "cooler" (default: "heater")
+    - state: "on" to force device on, "off" to force device off, null to cancel override
     - duration_minutes: how long override lasts (default 60 min, 0 = indefinite)
     - batch_id: required for batch-specific override
     """
     temp_control_enabled = await get_config_value(db, "temp_control_enabled")
+
+    # Validate device_type
+    if request.device_type not in ("heater", "cooler"):
+        return OverrideResponse(
+            success=False,
+            message=f"Invalid device_type: {request.device_type}. Must be 'heater' or 'cooler'.",
+            override_state=None,
+            override_until=None,
+            batch_id=request.batch_id
+        )
+
     # Require batch_id for override (multi-batch mode) - validate early
     if request.batch_id is None:
         return OverrideResponse(
             success=False,
-            message="batch_id is required for heater override",
+            message=f"batch_id is required for {request.device_type} override",
             override_state=None,
             override_until=None,
             batch_id=None
         )
 
-    # Verify batch exists and has heater configured - validate early before other checks
+    # Verify batch exists and has device configured - validate early before other checks
     batch = await db.get(Batch, request.batch_id)
     if not batch:
         return OverrideResponse(
@@ -291,24 +304,31 @@ async def set_override(request: OverrideRequest, db: AsyncSession = Depends(get_
             batch_id=request.batch_id
         )
 
-    if not batch.heater_entity_id:
+    # Validate that batch has the requested device entity configured
+    entity_id = batch.heater_entity_id if request.device_type == "heater" else batch.cooler_entity_id
+    if not entity_id:
         return OverrideResponse(
             success=False,
-            message=f"Batch {request.batch_id} has no heater entity configured",
+            message=f"Batch {request.batch_id} has no {request.device_type} entity configured",
             override_state=None,
             override_until=None,
             batch_id=request.batch_id
         )
 
-    success = set_manual_override(request.state, request.duration_minutes, batch_id=request.batch_id)
+    success = set_manual_override(
+        state=request.state,
+        duration_minutes=request.duration_minutes,
+        batch_id=request.batch_id,
+        device_type=request.device_type
+    )
 
     if success:
         batch_status = get_batch_control_status(request.batch_id)
         if request.state is None:
-            message = f"Override cancelled for batch {request.batch_id}, returning to automatic control"
+            message = f"{request.device_type.capitalize()} override cancelled for batch {request.batch_id}, returning to automatic control"
         else:
             duration_msg = f"for {request.duration_minutes} minutes" if request.duration_minutes > 0 else "indefinitely"
-            message = f"Heater override for batch {request.batch_id} set to {request.state} {duration_msg}"
+            message = f"{request.device_type.capitalize()} override for batch {request.batch_id} set to {request.state} {duration_msg}"
 
         return OverrideResponse(
             success=True,
@@ -320,7 +340,7 @@ async def set_override(request: OverrideRequest, db: AsyncSession = Depends(get_
     else:
         return OverrideResponse(
             success=False,
-            message="Failed to set override",
+            message=f"Failed to set {request.device_type} override",
             override_state=None,
             override_until=None,
             batch_id=request.batch_id

@@ -1,18 +1,23 @@
 """Model Predictive Control for fermentation temperature regulation.
 
 Uses a learned thermal model to predict temperature trajectory and prevent
-overshoot by computing optimal heater ON/OFF actions over a receding horizon.
+overshoot by computing optimal heater/cooler ON/OFF actions over a receding horizon.
 
 The thermal model accounts for:
 - Heater power (temperature rise when ON)
-- Natural cooling toward ambient temperature
-- Thermal inertia (time lag between heater state and temperature change)
+- Active cooling power (temperature drop when cooler ON)
+- Natural ambient exchange toward ambient temperature
+- Thermal inertia (time lag between heater/cooler state and temperature change)
+- Mutual exclusion (heater and cooler never run simultaneously)
 
 MPC solves an optimization problem at each time step:
-1. Predict temperature over next N hours for different heater sequences
+1. Predict temperature over next N hours for different heater/cooler sequences
 2. Choose sequence that minimizes distance from target without overshoot
 3. Apply first action from optimal sequence
 4. Repeat at next time step (receding horizon)
+
+Supports both heater-only mode (backward compatible) and dual-mode operation
+with independent heater and cooler control.
 """
 
 import logging

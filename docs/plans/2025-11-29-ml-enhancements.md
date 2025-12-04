@@ -10,6 +10,10 @@
 
 **Note on Overshoot Prevention:** Task 6 (MPC Temperature Controller) includes thermal inertia modeling inspired by BrewPi's overshoot prevention techniques. This solves Issue #60 where cooling overshoots target temperature and triggers unnecessary heating. The MPC predicts post-shutdown temperature drift using self-learning coefficients that adapt to your specific chamber characteristics.
 
+**Dual-Mode Extension (Issue #64):** The MPC now supports active cooling in addition to heating. The thermal model learns separate heating_rate and cooling_rate parameters from historical data, with shared ambient_coeff for natural heat exchange. Control decisions evaluate three actions: heater ON, cooler ON, or both OFF. Mutual exclusion is enforced in both learning and predictions. See `docs/plans/2025-12-05-mpc-dual-mode.md` for full design details.
+
+**Temperature Units:** All MPC calculations now use Celsius (°C) to align with project standards (CLAUDE.md). Previously used Fahrenheit.
+
 ---
 
 ## Research: Other Wireless/BLE Hydrometers (beyond Tilt)

@@ -161,6 +161,8 @@ export interface BatchResponse {
 	heater_entity_id?: string;
 	temp_target?: number;
 	temp_hysteresis?: number;
+	// Soft delete
+	deleted_at?: string;
 }
 
 export interface BatchCreate {
@@ -301,11 +303,13 @@ export async function fetchBatches(
 	status?: BatchStatus,
 	deviceId?: string,
 	limit: number = 50,
-	offset: number = 0
+	offset: number = 0,
+	deletedOnly: boolean = false
 ): Promise<BatchResponse[]> {
 	const params = new URLSearchParams();
 	if (status) params.append('status', status);
 	if (deviceId) params.append('device_id', deviceId);
+	if (deletedOnly) params.append('deleted_only', 'true');
 	params.append('limit', String(limit));
 	params.append('offset', String(offset));
 
@@ -314,6 +318,43 @@ export async function fetchBatches(
 		throw new Error(`Failed to fetch batches: ${response.statusText}`);
 	}
 	return response.json();
+}
+
+/**
+ * Fetch active batches (planning or fermenting)
+ */
+export async function fetchActiveBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	const params = new URLSearchParams();
+	params.append('limit', String(limit));
+	params.append('offset', String(offset));
+
+	const response = await fetch(`${BASE_URL}/batches/active?${params}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch active batches: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch completed batches (completed or conditioning)
+ */
+export async function fetchCompletedBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	const params = new URLSearchParams();
+	params.append('limit', String(limit));
+	params.append('offset', String(offset));
+
+	const response = await fetch(`${BASE_URL}/batches/completed?${params}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch completed batches: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch deleted batches
+ */
+export async function fetchDeletedBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	return fetchBatches(undefined, undefined, limit, offset, true);
 }
 
 /**
@@ -358,7 +399,7 @@ export async function updateBatch(batchId: number, update: BatchUpdate): Promise
 }
 
 /**
- * Delete a batch
+ * Delete a batch (soft delete)
  */
 export async function deleteBatch(batchId: number): Promise<void> {
 	const response = await fetch(`${BASE_URL}/batches/${batchId}`, {
@@ -367,6 +408,19 @@ export async function deleteBatch(batchId: number): Promise<void> {
 	if (!response.ok) {
 		throw new Error(`Failed to delete batch: ${response.statusText}`);
 	}
+}
+
+/**
+ * Restore a soft-deleted batch
+ */
+export async function restoreBatch(batchId: number): Promise<BatchResponse> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}/restore`, {
+		method: 'POST'
+	});
+	if (!response.ok) {
+		throw new Error(`Failed to restore batch: ${response.statusText}`);
+	}
+	return response.json();
 }
 
 /**

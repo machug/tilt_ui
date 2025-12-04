@@ -1,6 +1,6 @@
 # BrewSignal
 
-![Version](https://img.shields.io/badge/version-2.4.0-blue) ![Python](https://img.shields.io/badge/python-3.11+-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/machug/brewsignal/actions/workflows/ci.yml/badge.svg) ![Version](https://img.shields.io/badge/version-2.4.0-blue) ![Python](https://img.shields.io/badge/python-3.11+-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 A modern web interface for monitoring fermentation hydrometers on Raspberry Pi. Supports Tilt, iSpindel, and GravityMon devices.
 

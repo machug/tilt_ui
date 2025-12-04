@@ -173,12 +173,18 @@ class MLPipeline:
         # Stage 4: MPC temperature control
         if self.mpc_controller and target_temp is not None and ambient_temp is not None:
             # Learn thermal model if we have enough history
-            if len(self.temp_history) >= 3 and len(self.heater_history) >= 3:
+            # CRITICAL: All histories must be same length for MPC learning
+            min_history_len = min(
+                len(self.temp_history),
+                len(self.heater_history),
+                len(self.ambient_history),
+            )
+            if min_history_len >= 3:
                 self.mpc_controller.learn_thermal_model(
-                    temp_history=self.temp_history,
-                    time_history=self.time_history,
-                    heater_history=self.heater_history,
-                    ambient_history=self.ambient_history,
+                    temp_history=self.temp_history[-min_history_len:],
+                    time_history=self.time_history[-min_history_len:],
+                    heater_history=self.heater_history[-min_history_len:],
+                    ambient_history=self.ambient_history[-min_history_len:],
                 )
 
             # Compute control action

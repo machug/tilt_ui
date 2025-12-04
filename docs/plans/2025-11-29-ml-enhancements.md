@@ -10,6 +10,13 @@
 
 **Note on Overshoot Prevention:** Task 6 (MPC Temperature Controller) includes thermal inertia modeling inspired by BrewPi's overshoot prevention techniques. This solves Issue #60 where cooling overshoots target temperature and triggers unnecessary heating. The MPC predicts post-shutdown temperature drift using self-learning coefficients that adapt to your specific chamber characteristics.
 
+## Status / Progress
+- [x] Task 1: Test infrastructure in place (fixtures for noisy Tilt readings + fermentation curve) — commit `cd2e372`
+- [x] Task 2: ML module scaffold with `MLConfig` feature flags and env overrides — commit `504dc14`
+- [x] Task 3: Adaptive Kalman filter with RSSI-aware measurement noise; smoothing, rate estimation, reset — commit `0b3cad6`
+- Verification: `python -m pytest` (targeted) → 7/7 tests passing (`tests/test_ml_config.py`, `tests/test_kalman.py`)
+- Next focus: Task 4 (anomaly detection) and Task 5 (curve fitting/predictions)
+
 ---
 
 ## Research: Other Wireless/BLE Hydrometers (beyond Tilt)

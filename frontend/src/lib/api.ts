@@ -483,3 +483,62 @@ export async function deleteRecipe(id: number): Promise<void> {
 		throw new Error(error.detail || 'Failed to delete recipe');
 	}
 }
+
+// ============================================================================
+// Maintenance Types & API
+// ============================================================================
+
+export interface OrphanedDataReport {
+	orphaned_readings_count: number;
+	orphaned_readings: number[]; // Reading IDs
+	batches_with_orphans: Record<number, number>; // batch_id -> count
+}
+
+export interface CleanupPreview {
+	readings_to_delete: number[]; // Reading IDs
+	total_count: number;
+	batch_breakdown: Record<number, number>; // batch_id -> count
+}
+
+/**
+ * Fetch orphaned data report (readings linked to deleted batches)
+ */
+export async function fetchOrphanedData(): Promise<OrphanedDataReport> {
+	const response = await fetch(`${BASE_URL}/maintenance/orphaned-data`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch orphaned data: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Preview cleanup of readings for deleted batches
+ */
+export async function previewCleanup(batchIds: number[]): Promise<CleanupPreview> {
+	const response = await fetch(`${BASE_URL}/maintenance/cleanup-readings`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ deleted_batch_ids: batchIds, dry_run: true })
+	});
+	if (!response.ok) {
+		const error = await response.json().catch(() => ({ detail: response.statusText }));
+		throw new Error(error.detail || 'Failed to preview cleanup');
+	}
+	return response.json();
+}
+
+/**
+ * Execute cleanup of readings for deleted batches
+ */
+export async function executeCleanup(batchIds: number[]): Promise<CleanupPreview> {
+	const response = await fetch(`${BASE_URL}/maintenance/cleanup-readings`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ deleted_batch_ids: batchIds, dry_run: false })
+	});
+	if (!response.ok) {
+		const error = await response.json().catch(() => ({ detail: response.statusText }));
+		throw new Error(error.detail || 'Failed to execute cleanup');
+	}
+	return response.json();
+}

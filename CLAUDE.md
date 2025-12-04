@@ -251,6 +251,34 @@ mcp__chrome-devtools__list_network_requests
 
 ## Key Technical Details
 
+### Temperature Units
+
+**CRITICAL: Always use Celsius (°C) for internal calculations, storage, and API responses.**
+
+- **Database:** All temperature values stored in Celsius
+- **Backend Logic:** All temperature calculations, control logic, and ML models use Celsius
+- **API:** All temperature values in JSON responses are Celsius
+- **UI Conversion:** Frontend converts to user's preferred unit (C/F) based on system preferences
+- **Tilt BLE Boundary:** Tilt devices broadcast in Fahrenheit - convert immediately on ingestion
+- **iSpindel/GravityMon:** Already send Celsius - no conversion needed
+
+**Temperature Conversion Helpers:**
+- `backend/services/temp_utils.py` - Centralized conversion utilities
+- Frontend stores: `src/lib/state.ts` - User preference for display units
+- UI components: Handle display conversion automatically based on preferences
+
+**Why Celsius?**
+- International standard for scientific/brewing calculations
+- Home Assistant default unit system
+- iSpindel/GravityMon native format
+- Only Tilt hardware requires conversion at boundary
+
+**When Adding Temperature Features:**
+1. Always work in Celsius internally
+2. Only convert for display in UI based on user preference
+3. Document any Fahrenheit values in comments as "for Tilt BLE compatibility only"
+4. Never hardcode temperature values - use config or calculations
+
 ### Device Pairing System
 
 Devices (Tilts) must be **paired** before logging readings. This prevents data pollution from nearby devices.

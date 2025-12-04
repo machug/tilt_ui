@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Batch Lifecycle Management** - Complete soft delete and data maintenance system
+  - Tab-based navigation on batch list page (Active, Completed, Deleted)
+  - Soft delete and restore functionality for batches
+  - Hard delete option with cascade to readings
+  - Data maintenance page for orphaned reading cleanup
+  - Orphaned data detection and reporting
+  - Preview-first cleanup pattern for safety
+  - Convenience endpoints: `/api/batches/active` and `/api/batches/completed`
+  - Maintenance API endpoints for data integrity
 - **Chart Crosshair Tooltips** (#55) - Display exact reading values at crosshair position
   - Shows timestamp, gravity (with proper unit formatting), wort temperature, ambient temperature, and trend line values
   - Floating tooltip with semi-transparent background and backdrop blur for readability
@@ -18,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Per-device buffers maintain recent readings for window calculation
   - Smoothed values stored in database benefit charts, exports, and Home Assistant integration
 
+### Changed
+- Batch list page now uses tab navigation instead of status filter chips
+- Removed "archived" status in favor of soft delete pattern
+- Default batch list now excludes deleted batches
+- Enhanced batch filtering with `include_deleted` and `deleted_only` query parameters
+
 ### Fixed
 - **Chart Outlier Spikes** (#55) - Physically impossible readings no longer corrupt charts
   - Added validation for SG range (0.500-1.200) and temperature range (32-212°F)
@@ -25,12 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Historical outliers cleaned up via migration (83 outliers marked invalid)
   - Charts now only display validated readings
 
+### Migration
+- Added `deleted_at` column to batches table
+- Existing "archived" batches automatically migrated to "completed" status
+
 ### Technical
 - Created `SmoothingService` with moving average algorithm in `backend/services/smoothing.py`
 - Added outlier validation in `backend/main.py` `handle_tilt_reading()` function
 - Updated `backend/routers/tilts.py` to filter `status='valid'` readings in all queries
 - Migration script `backend/migrations/mark_outliers_invalid.py` to clean historical data
 - uPlot legend enabled with live updates and custom tooltip styling
+- New `backend/routers/maintenance.py` router for orphaned data management
+- Soft delete logic in `backend/routers/batches.py` with cascade support
 
 ### Code Review Fixes (PR #56)
 - **Database Migration**: Added status column migration with index for query performance in `backend/database.py`

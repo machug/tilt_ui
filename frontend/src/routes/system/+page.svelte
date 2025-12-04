@@ -430,6 +430,15 @@
 	<div class="page-header">
 		<h1 class="page-title">System</h1>
 		<p class="page-description">System settings, timezone configuration, and power controls</p>
+		<div class="header-actions">
+			<a href="/system/maintenance" class="btn-secondary-link">
+				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+					<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+				</svg>
+				Data Maintenance
+			</a>
+		</div>
 	</div>
 
 	{#if loading}
@@ -1116,6 +1125,31 @@
 	.page-description {
 		color: var(--text-secondary);
 		font-size: 0.875rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.header-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.btn-secondary-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--accent);
+		background: var(--accent-muted);
+		border: 1px solid var(--accent-muted);
+		border-radius: 0.5rem;
+		text-decoration: none;
+		transition: all 0.15s ease;
+	}
+
+	.btn-secondary-link:hover {
+		background: rgba(59, 130, 246, 0.2);
 	}
 
 	.card {

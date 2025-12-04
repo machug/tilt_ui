@@ -1,16 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import type { BatchResponse, BatchProgressResponse, BatchStatus } from '$lib/api';
-	import { fetchBatches, fetchBatchProgress, deleteBatch } from '$lib/api';
+	import type { BatchResponse, BatchProgressResponse } from '$lib/api';
+	import { fetchActiveBatches, fetchCompletedBatches, fetchDeletedBatches, fetchBatchProgress, deleteBatch, restoreBatch } from '$lib/api';
 	import BatchCard from '$lib/components/BatchCard.svelte';
 	import { tiltsState } from '$lib/stores/tilts.svelte';
+
+	type TabType = 'active' | 'completed' | 'deleted';
 
 	// State
 	let batches = $state<BatchResponse[]>([]);
 	let progressMap = $state<Map<number, BatchProgressResponse>>(new Map());
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let activeTab = $state<TabType>('active');
+	let searchQuery = $state('');
+	let notification = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 
 	// Map device_id to batch_id for live updates
 	let deviceToBatch = $derived(
@@ -56,28 +61,14 @@
 		return enhanced;
 	});
 
-	// Filters
-	let statusFilter = $state<BatchStatus | ''>('');
-	let searchQuery = $state('');
-
-	const statusOptions: { value: BatchStatus | ''; label: string }[] = [
-		{ value: '', label: 'All Batches' },
-		{ value: 'planning', label: 'Planning' },
-		{ value: 'fermenting', label: 'Fermenting' },
-		{ value: 'conditioning', label: 'Conditioning' },
-		{ value: 'completed', label: 'Completed' },
-		{ value: 'archived', label: 'Archived' }
-	];
-
 	// Filtered batches
 	let filteredBatches = $derived(
 		batches.filter((b) => {
-			const matchesStatus = !statusFilter || b.status === statusFilter;
 			const matchesSearch =
 				!searchQuery ||
 				(b.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
 				(b.recipe?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-			return matchesStatus && matchesSearch;
+			return matchesSearch;
 		})
 	);
 
@@ -85,7 +76,19 @@
 		loading = true;
 		error = null;
 		try {
-			batches = await fetchBatches(statusFilter || undefined);
+			// Load batches based on active tab
+			switch (activeTab) {
+				case 'active':
+					batches = await fetchActiveBatches();
+					break;
+				case 'completed':
+					batches = await fetchCompletedBatches();
+					break;
+				case 'deleted':
+					batches = await fetchDeletedBatches();
+					break;
+			}
+
 			// Load progress for fermenting/conditioning batches
 			const activeStatuses = ['fermenting', 'conditioning'];
 			const activeBatches = batches.filter((b) => activeStatuses.includes(b.status));
@@ -116,23 +119,47 @@
 		goto(`/batches/${batchId}`);
 	}
 
-	async function handleDelete(batchId: number) {
-		if (!confirm('Are you sure you want to delete this batch?')) return;
+	async function handleDelete(batchId: number, batchName: string) {
+		const isHardDelete = activeTab === 'deleted';
+		const confirmMessage = isHardDelete
+			? 'This will permanently delete this batch. This cannot be undone. Are you sure?'
+			: `Soft delete "${batchName}"? You can restore it later from the Deleted tab.`;
+
+		if (!confirm(confirmMessage)) return;
+
 		try {
-			await deleteBatch(batchId);
-			batches = batches.filter((b) => b.id !== batchId);
+			await deleteBatch(batchId, isHardDelete);
+			showNotification('Batch deleted successfully', 'success');
+			await loadBatches();
 		} catch (e) {
-			alert('Failed to delete batch');
+			showNotification('Failed to delete batch', 'error');
 		}
+	}
+
+	async function handleRestore(batchId: number, batchName: string) {
+		try {
+			await restoreBatch(batchId);
+			showNotification(`"${batchName}" restored successfully`, 'success');
+			await loadBatches();
+		} catch (e) {
+			showNotification('Failed to restore batch', 'error');
+		}
+	}
+
+	function showNotification(message: string, type: 'success' | 'error') {
+		notification = { message, type };
+		setTimeout(() => {
+			notification = null;
+		}, 3000);
 	}
 
 	onMount(() => {
 		loadBatches();
 	});
 
-	// Reload when filter changes
+	// Reload when tab changes
 	$effect(() => {
-		if (statusFilter !== undefined) {
+		if (activeTab !== undefined) {
 			loadBatches();
 		}
 	});
@@ -143,6 +170,14 @@
 </svelte:head>
 
 <div class="page-container">
+	<!-- Notification -->
+	{#if notification}
+		<div class="notification" class:success={notification.type === 'success'} class:error={notification.type === 'error'}>
+			<span>{notification.message}</span>
+			<button type="button" class="notification-close" onclick={() => (notification = null)}>×</button>
+		</div>
+	{/if}
+
 	<!-- Header -->
 	<div class="page-header">
 		<div class="header-content">
@@ -157,19 +192,33 @@
 		</button>
 	</div>
 
-	<!-- Filters -->
-	<div class="filters-row">
-		<div class="filter-chips">
-			{#each statusOptions as option}
-				<button
-					type="button"
-					class="filter-chip"
-					class:active={statusFilter === option.value}
-					onclick={() => (statusFilter = option.value)}
-				>
-					{option.label}
-				</button>
-			{/each}
+	<!-- Tabs -->
+	<div class="tabs-container">
+		<div class="tabs">
+			<button
+				type="button"
+				class="tab"
+				class:active={activeTab === 'active'}
+				onclick={() => (activeTab = 'active')}
+			>
+				Active
+			</button>
+			<button
+				type="button"
+				class="tab"
+				class:active={activeTab === 'completed'}
+				onclick={() => (activeTab = 'completed')}
+			>
+				Completed
+			</button>
+			<button
+				type="button"
+				class="tab"
+				class:active={activeTab === 'deleted'}
+				onclick={() => (activeTab = 'deleted')}
+			>
+				Deleted
+			</button>
 		</div>
 		<div class="search-box">
 			<svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -200,25 +249,73 @@
 		<div class="empty-state">
 			{#if batches.length === 0}
 				<div class="empty-icon">🍺</div>
-				<h3>No batches yet</h3>
-				<p>Create your first batch to start tracking fermentation</p>
-				<button type="button" class="create-btn" onclick={() => goto('/batches/new')}>
-					Create Batch
-				</button>
+				<h3>No {activeTab} batches yet</h3>
+				<p>
+					{#if activeTab === 'active'}
+						Create your first batch to start tracking fermentation
+					{:else if activeTab === 'completed'}
+						Complete a batch to see it here
+					{:else}
+						Deleted batches will appear here
+					{/if}
+				</p>
+				{#if activeTab === 'active'}
+					<button type="button" class="create-btn" onclick={() => goto('/batches/new')}>
+						Create Batch
+					</button>
+				{/if}
 			{:else}
 				<div class="empty-icon">🔍</div>
 				<h3>No matches</h3>
-				<p>Try adjusting your filters or search query</p>
+				<p>Try adjusting your search query</p>
 			{/if}
 		</div>
 	{:else}
 		<div class="batches-grid">
 			{#each filteredBatches as batch (batch.id)}
-				<BatchCard
-					{batch}
-					progress={liveProgressMap.get(batch.id)}
-					onViewDetails={() => handleViewDetails(batch.id)}
-				/>
+				<div class="batch-wrapper">
+					<!-- Deleted badge -->
+					{#if batch.deleted_at}
+						<div class="deleted-badge">
+							<svg class="badge-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+							</svg>
+							Deleted {new Date(batch.deleted_at).toLocaleDateString()}
+						</div>
+					{/if}
+
+					<BatchCard
+						{batch}
+						progress={liveProgressMap.get(batch.id)}
+						onViewDetails={() => handleViewDetails(batch.id)}
+					/>
+
+					<!-- Action buttons for deleted batches -->
+					{#if batch.deleted_at}
+						<div class="batch-actions">
+							<button
+								type="button"
+								class="action-restore"
+								onclick={() => handleRestore(batch.id, batch.name || batch.recipe?.name || 'Unnamed Batch')}
+							>
+								<svg class="action-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+								</svg>
+								Restore
+							</button>
+							<button
+								type="button"
+								class="action-delete"
+								onclick={() => handleDelete(batch.id, batch.name || batch.recipe?.name || 'Unnamed Batch')}
+							>
+								<svg class="action-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+								Permanent Delete
+							</button>
+						</div>
+					{/if}
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -280,42 +377,96 @@
 		height: 1rem;
 	}
 
-	/* Filters */
-	.filters-row {
+	/* Notification */
+	.notification {
+		position: fixed;
+		top: 1rem;
+		right: 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		z-index: 1000;
+		animation: slideIn 0.2s ease-out;
+	}
+
+	@keyframes slideIn {
+		from {
+			transform: translateX(100%);
+			opacity: 0;
+		}
+		to {
+			transform: translateX(0);
+			opacity: 1;
+		}
+	}
+
+	.notification.success {
+		background: var(--positive);
+		color: white;
+	}
+
+	.notification.error {
+		background: var(--negative);
+		color: white;
+	}
+
+	.notification-close {
+		background: none;
+		border: none;
+		color: inherit;
+		font-size: 1.5rem;
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
+		opacity: 0.8;
+		transition: opacity var(--transition);
+	}
+
+	.notification-close:hover {
+		opacity: 1;
+	}
+
+	/* Tabs */
+	.tabs-container {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 1rem;
 		margin-bottom: 1.5rem;
 		align-items: center;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 
-	.filter-chips {
+	.tabs {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: 0;
 	}
 
-	.filter-chip {
-		padding: 0.5rem 0.875rem;
-		font-size: 0.8125rem;
+	.tab {
+		position: relative;
+		padding: 0.75rem 1.5rem;
+		font-size: 0.9375rem;
 		font-weight: 500;
 		color: var(--text-secondary);
-		background: var(--bg-elevated);
-		border: 1px solid var(--border-subtle);
-		border-radius: 9999px;
+		background: transparent;
+		border: none;
+		border-bottom: 2px solid transparent;
 		cursor: pointer;
 		transition: all var(--transition);
 	}
 
-	.filter-chip:hover {
+	.tab:hover {
 		color: var(--text-primary);
-		border-color: var(--border-default);
+		background: var(--bg-hover);
 	}
 
-	.filter-chip.active {
+	.tab.active {
 		color: var(--accent);
-		background: var(--accent-muted);
-		border-color: transparent;
+		border-bottom-color: var(--accent);
 	}
 
 	.search-box {
@@ -361,6 +512,80 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 		gap: 1rem;
+	}
+
+	.batch-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	/* Deleted badge */
+	.deleted-badge {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--negative);
+		background: rgba(239, 68, 68, 0.1);
+		border: 1px solid rgba(239, 68, 68, 0.2);
+		border-radius: 0.375rem;
+		width: fit-content;
+	}
+
+	.badge-icon {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+
+	/* Batch actions */
+	.batch-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+
+	.action-restore,
+	.action-delete {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.375rem;
+		padding: 0.625rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		border: 1px solid;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all var(--transition);
+	}
+
+	.action-restore {
+		color: var(--positive);
+		background: transparent;
+		border-color: var(--positive);
+	}
+
+	.action-restore:hover {
+		background: rgba(34, 197, 94, 0.1);
+	}
+
+	.action-delete {
+		color: var(--negative);
+		background: transparent;
+		border-color: var(--negative);
+	}
+
+	.action-delete:hover {
+		background: rgba(239, 68, 68, 0.1);
+	}
+
+	.action-icon {
+		width: 1rem;
+		height: 1rem;
 	}
 
 	/* Loading/Error/Empty states */
@@ -444,9 +669,20 @@
 			flex-direction: column;
 		}
 
-		.filters-row {
+		.tabs-container {
 			flex-direction: column;
 			align-items: stretch;
+		}
+
+		.tabs {
+			width: 100%;
+			justify-content: space-around;
+		}
+
+		.tab {
+			flex: 1;
+			text-align: center;
+			padding: 0.75rem 1rem;
 		}
 
 		.search-box {
@@ -456,6 +692,11 @@
 
 		.batches-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.notification {
+			left: 1rem;
+			right: 1rem;
 		}
 	}
 </style>

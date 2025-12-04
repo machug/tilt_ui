@@ -82,6 +82,7 @@ npm run check
 - `backend/routers/alerts.py` - Weather alerts
 - `backend/routers/ambient.py` - Ambient readings
 - `backend/routers/ha.py` - Home Assistant integration
+- `backend/routers/maintenance.py` - Orphaned data detection and cleanup
 
 ### Database Migrations
 
@@ -301,6 +302,36 @@ WebSocket endpoint: `ws://host:8080/ws`
 ```
 
 Frontend connects on mount, receives live readings, updates charts.
+
+### Batch Lifecycle Management
+
+**Soft Delete Pattern:** Batches use soft delete (deleted_at timestamp) to preserve historical data while removing from active views.
+
+**Status Flow:**
+- Planning → Fermenting → Completed/Conditioning
+- Any status can be soft deleted (marked with deleted_at)
+- Deleted batches can be restored (deleted_at set to null)
+- Hard delete cascades to readings
+
+**Tab-Based Filtering:**
+- Active tab: Shows batches with status "planning" or "fermenting" (not deleted)
+- Completed tab: Shows batches with status "completed" or "conditioning" (not deleted)
+- Deleted tab: Shows soft-deleted batches (deleted_at is not null)
+
+**Orphaned Data Cleanup:**
+- Orphaned readings: Readings linked to soft-deleted batches
+- Maintenance page: `/system/maintenance`
+- Preview-first pattern: dry_run=true before actual cleanup
+- Safety checks: Cannot cleanup readings for active batches
+
+**API Endpoints:**
+- GET `/api/batches` - List batches (supports `include_deleted`, `deleted_only` query params)
+- GET `/api/batches/active` - Convenience endpoint for active batches
+- GET `/api/batches/completed` - Convenience endpoint for completed batches
+- POST `/api/batches/{id}/delete` - Soft delete (default) or hard delete (with `hard_delete=true`)
+- POST `/api/batches/{id}/restore` - Restore soft-deleted batch
+- GET `/api/maintenance/orphaned-data` - Detect orphaned readings
+- POST `/api/maintenance/cleanup-readings` - Preview/execute cleanup
 
 ## Common Patterns
 

@@ -16,7 +16,7 @@ from sqlalchemy import select, desc
 from . import models  # noqa: F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db
 from .models import Reading, Tilt, serialize_datetime_to_utc
-from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, recipes, system, tilts
+from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, maintenance, recipes, system, tilts
 from .routers.config import get_config_value
 from .ambient_poller import start_ambient_poller, stop_ambient_poller
 from .temp_controller import start_temp_controller, stop_temp_controller
@@ -206,6 +206,7 @@ app.include_router(alerts.router)
 app.include_router(ingest.router)
 app.include_router(recipes.router)
 app.include_router(batches.router)
+app.include_router(maintenance.router)
 
 
 @app.get("/api/health")

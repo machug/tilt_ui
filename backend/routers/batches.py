@@ -27,16 +27,24 @@ router = APIRouter(prefix="/api/batches", tags=["batches"])
 async def list_batches(
     status: Optional[str] = Query(None, description="Filter by status"),
     device_id: Optional[str] = Query(None, description="Filter by device"),
+    include_deleted: bool = Query(False, description="Include soft-deleted batches"),
+    deleted_only: bool = Query(False, description="Show only deleted batches (for maintenance)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    """List batches with optional filters."""
+    """List batches with optional filters. By default excludes deleted batches."""
     query = (
         select(Batch)
         .options(selectinload(Batch.recipe).selectinload(Recipe.style))
         .order_by(Batch.created_at.desc())
     )
+
+    # Soft delete filter (default: hide deleted)
+    if deleted_only:
+        query = query.where(Batch.deleted_at.is_not(None))
+    elif not include_deleted:
+        query = query.where(Batch.deleted_at.is_(None))
 
     if status:
         query = query.where(Batch.status == status)
@@ -44,6 +52,38 @@ async def list_batches(
         query = query.where(Batch.device_id == device_id)
 
     query = query.offset(offset).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/active", response_model=list[BatchResponse])
+async def list_active_batches(db: AsyncSession = Depends(get_db)):
+    """Active batches: planning or fermenting status, not deleted."""
+    query = (
+        select(Batch)
+        .options(selectinload(Batch.recipe).selectinload(Recipe.style))
+        .where(
+            Batch.deleted_at.is_(None),
+            Batch.status.in_(["planning", "fermenting"])
+        )
+        .order_by(Batch.created_at.desc())
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/completed", response_model=list[BatchResponse])
+async def list_completed_batches(db: AsyncSession = Depends(get_db)):
+    """Historical batches: completed or conditioning, not deleted."""
+    query = (
+        select(Batch)
+        .options(selectinload(Batch.recipe).selectinload(Recipe.style))
+        .where(
+            Batch.deleted_at.is_(None),
+            Batch.status.in_(["completed", "conditioning"])
+        )
+        .order_by(Batch.updated_at.desc())
+    )
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -133,9 +173,15 @@ async def create_batch(
     await db.commit()
     await db.refresh(db_batch)
 
-    # Load recipe relationship for response
+    # Load recipe relationship with nested style for response
     if db_batch.recipe_id:
-        await db.refresh(db_batch, ["recipe"])
+        query = (
+            select(Batch)
+            .options(selectinload(Batch.recipe).selectinload(Recipe.style))
+            .where(Batch.id == db_batch.id)
+        )
+        result = await db.execute(query)
+        db_batch = result.scalar_one()
 
     return db_batch
 
@@ -245,16 +291,45 @@ async def update_batch(
     return batch
 
 
-@router.delete("/{batch_id}")
-async def delete_batch(batch_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete a batch."""
+@router.post("/{batch_id}/delete")
+async def soft_delete_batch(
+    batch_id: int,
+    hard_delete: bool = Query(False, description="Cascade delete readings"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft delete or hard delete a batch.
+
+    - Soft delete (default): Sets deleted_at timestamp, preserves all data
+    - Hard delete: Cascade removes all readings via relationship
+    """
     batch = await db.get(Batch, batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
-    await db.delete(batch)
+    if hard_delete:
+        # Hard delete: cascade removes readings via relationship
+        await db.delete(batch)
+        await db.commit()
+        return {"status": "deleted", "type": "hard", "batch_id": batch_id}
+    else:
+        # Soft delete: set timestamp
+        batch.deleted_at = datetime.now(timezone.utc)
+        await db.commit()
+        return {"status": "deleted", "type": "soft", "batch_id": batch_id}
+
+
+@router.post("/{batch_id}/restore")
+async def restore_batch(batch_id: int, db: AsyncSession = Depends(get_db)):
+    """Restore a soft-deleted batch."""
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if not batch.deleted_at:
+        raise HTTPException(status_code=400, detail="Batch is not deleted")
+
+    batch.deleted_at = None
     await db.commit()
-    return {"status": "deleted"}
+    return {"status": "restored", "batch_id": batch_id}
 
 
 @router.get("/{batch_id}/progress", response_model=BatchProgressResponse)

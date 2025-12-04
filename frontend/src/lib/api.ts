@@ -161,6 +161,8 @@ export interface BatchResponse {
 	heater_entity_id?: string;
 	temp_target?: number;
 	temp_hysteresis?: number;
+	// Soft delete
+	deleted_at?: string;
 }
 
 export interface BatchCreate {
@@ -301,11 +303,13 @@ export async function fetchBatches(
 	status?: BatchStatus,
 	deviceId?: string,
 	limit: number = 50,
-	offset: number = 0
+	offset: number = 0,
+	deletedOnly: boolean = false
 ): Promise<BatchResponse[]> {
 	const params = new URLSearchParams();
 	if (status) params.append('status', status);
 	if (deviceId) params.append('device_id', deviceId);
+	if (deletedOnly) params.append('deleted_only', 'true');
 	params.append('limit', String(limit));
 	params.append('offset', String(offset));
 
@@ -314,6 +318,43 @@ export async function fetchBatches(
 		throw new Error(`Failed to fetch batches: ${response.statusText}`);
 	}
 	return response.json();
+}
+
+/**
+ * Fetch active batches (planning or fermenting)
+ */
+export async function fetchActiveBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	const params = new URLSearchParams();
+	params.append('limit', String(limit));
+	params.append('offset', String(offset));
+
+	const response = await fetch(`${BASE_URL}/batches/active?${params}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch active batches: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch completed batches (completed or conditioning)
+ */
+export async function fetchCompletedBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	const params = new URLSearchParams();
+	params.append('limit', String(limit));
+	params.append('offset', String(offset));
+
+	const response = await fetch(`${BASE_URL}/batches/completed?${params}`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch completed batches: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Fetch deleted batches
+ */
+export async function fetchDeletedBatches(limit: number = 50, offset: number = 0): Promise<BatchResponse[]> {
+	return fetchBatches(undefined, undefined, limit, offset, true);
 }
 
 /**
@@ -358,15 +399,32 @@ export async function updateBatch(batchId: number, update: BatchUpdate): Promise
 }
 
 /**
- * Delete a batch
+ * Delete a batch (soft delete by default, hard delete optional)
  */
-export async function deleteBatch(batchId: number): Promise<void> {
-	const response = await fetch(`${BASE_URL}/batches/${batchId}`, {
-		method: 'DELETE'
+export async function deleteBatch(batchId: number, hardDelete: boolean = false): Promise<void> {
+	const url = new URL(`${BASE_URL}/batches/${batchId}/delete`);
+	if (hardDelete) {
+		url.searchParams.set('hard_delete', 'true');
+	}
+	const response = await fetch(url.toString(), {
+		method: 'POST'
 	});
 	if (!response.ok) {
 		throw new Error(`Failed to delete batch: ${response.statusText}`);
 	}
+}
+
+/**
+ * Restore a soft-deleted batch
+ */
+export async function restoreBatch(batchId: number): Promise<BatchResponse> {
+	const response = await fetch(`${BASE_URL}/batches/${batchId}/restore`, {
+		method: 'POST'
+	});
+	if (!response.ok) {
+		throw new Error(`Failed to restore batch: ${response.statusText}`);
+	}
+	return response.json();
 }
 
 /**
@@ -428,4 +486,63 @@ export async function deleteRecipe(id: number): Promise<void> {
 		const error = await response.json().catch(() => ({ detail: response.statusText }));
 		throw new Error(error.detail || 'Failed to delete recipe');
 	}
+}
+
+// ============================================================================
+// Maintenance Types & API
+// ============================================================================
+
+export interface OrphanedDataReport {
+	orphaned_readings_count: number;
+	orphaned_readings: number[]; // Reading IDs
+	batches_with_orphans: Record<number, number>; // batch_id -> count
+}
+
+export interface CleanupPreview {
+	readings_to_delete: number[]; // Reading IDs
+	total_count: number;
+	batch_breakdown: Record<number, number>; // batch_id -> count
+}
+
+/**
+ * Fetch orphaned data report (readings linked to deleted batches)
+ */
+export async function fetchOrphanedData(): Promise<OrphanedDataReport> {
+	const response = await fetch(`${BASE_URL}/maintenance/orphaned-data`);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch orphaned data: ${response.statusText}`);
+	}
+	return response.json();
+}
+
+/**
+ * Preview cleanup of readings for deleted batches
+ */
+export async function previewCleanup(batchIds: number[]): Promise<CleanupPreview> {
+	const response = await fetch(`${BASE_URL}/maintenance/cleanup-readings`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ deleted_batch_ids: batchIds, dry_run: true })
+	});
+	if (!response.ok) {
+		const error = await response.json().catch(() => ({ detail: response.statusText }));
+		throw new Error(error.detail || 'Failed to preview cleanup');
+	}
+	return response.json();
+}
+
+/**
+ * Execute cleanup of readings for deleted batches
+ */
+export async function executeCleanup(batchIds: number[]): Promise<CleanupPreview> {
+	const response = await fetch(`${BASE_URL}/maintenance/cleanup-readings`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ deleted_batch_ids: batchIds, dry_run: false })
+	});
+	if (!response.ok) {
+		const error = await response.json().catch(() => ({ detail: response.statusText }));
+		throw new Error(error.detail || 'Failed to execute cleanup');
+	}
+	return response.json();
 }

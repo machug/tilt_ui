@@ -140,7 +140,7 @@ query = select(Batch).options(selectinload(Batch.recipe).selectinload(Recipe.sty
 **Connection:**
 
 ```bash
-ssh pi@192.168.4.117
+ssh pi@192.168.4.218
 # Password: tilt
 ```
 
@@ -170,7 +170,7 @@ git push
 **3. Deploy to Raspberry Pi:**
 
 ```bash
-sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 \
+sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.218 \
   "cd /opt/brewsignal && git fetch origin && git reset --hard origin/master && sudo systemctl restart brewsignal"
 ```
 
@@ -178,13 +178,13 @@ sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 \
 
 ```bash
 # Check service status
-sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 "sudo systemctl status brewsignal"
+sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.218 "sudo systemctl status brewsignal"
 
 # View logs
-sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 "sudo journalctl -u brewsignal -n 100 --no-pager"
+sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.218 "sudo journalctl -u brewsignal -n 100 --no-pager"
 
 # Live log tail
-sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 "sudo journalctl -u brewsignal -f"
+sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.218 "sudo journalctl -u brewsignal -f"
 ```
 
 **One-liner deploy (all steps):**
@@ -192,7 +192,7 @@ sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 "sudo journal
 ```bash
 cd frontend && npm run build && cd .. && \
 git add . && git commit -m "build: deploy to RPi" && git push && \
-sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.117 \
+sshpass -p 'tilt' ssh -o StrictHostKeyChecking=no pi@192.168.4.218 \
   "cd /opt/brewsignal && git fetch origin && git reset --hard origin/master && sudo systemctl restart brewsignal"
 ```
 
@@ -237,7 +237,7 @@ Use the MCP Chrome DevTools integration to visually validate the deployed applic
 
 ```bash
 # Navigate to the app
-mcp__chrome-devtools__new_page http://192.168.4.117:8080
+mcp__chrome-devtools__new_page http://192.168.4.218:8080
 
 # Take snapshot
 mcp__chrome-devtools__take_snapshot

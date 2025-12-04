@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2025-12-04
+
 ### Added
+- **Cooling Control Support** (#58) - Dual-mode temperature regulation with independent heater and cooler control
+  - Per-batch cooler entity configuration (switch or input_boolean)
+  - Symmetric hysteresis logic for both heating and cooling
+  - Mutual exclusion enforcement (heater and cooler never run simultaneously)
+  - Support for three operational modes: heating-only, cooling-only, or dual-mode
+  - Minimum cycle time protection (5 minutes) for cooler compressor safety
+  - Real-time cooler state display on batch detail page
+  - Cooler entity selection dropdown on batch creation/edit forms
 - **Batch Lifecycle Management** - Complete soft delete and data maintenance system
   - Tab-based navigation on batch list page (Active, Completed, Deleted)
   - Soft delete and restore functionality for batches
@@ -26,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Applied after calibration but before storage for consistent smoothed data across all consumers
   - Per-device buffers maintain recent readings for window calculation
   - Smoothed values stored in database benefit charts, exports, and Home Assistant integration
+
+### Fixed
+- **Batch Delete Button** - Fixed delete functionality that was broken due to URL construction error
+  - Changed `deleteBatch()` to use relative URL string instead of `new URL()` constructor
+  - `new URL()` requires absolute URLs but `BASE_URL` was relative (`'/api'`)
+  - Replaced browser `confirm()` with modal dialog for better UX and reliability
+  - Modal prevents event handler binding issues in Svelte 5
 
 ### Changed
 - Batch list page now uses tab navigation instead of status filter chips

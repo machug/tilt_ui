@@ -71,13 +71,27 @@ class MPCTemperatureController:
         Returns:
             Dictionary with learned parameters and fit quality
         """
-        if len(temp_history) < 3:
+        # Validate all histories have same length
+        min_len = min(
+            len(temp_history),
+            len(time_history),
+            len(heater_history),
+            len(ambient_history),
+        )
+
+        if min_len < 3:
             return {
                 "success": False,
                 "reason": "insufficient_data",
                 "heating_rate": None,
                 "cooling_coeff": None,
             }
+
+        # Slice all histories to same length to prevent IndexError
+        temp_history = temp_history[-min_len:]
+        time_history = time_history[-min_len:]
+        heater_history = heater_history[-min_len:]
+        ambient_history = ambient_history[-min_len:]
 
         # Calculate temperature rates (dT/dt)
         heating_rates = []

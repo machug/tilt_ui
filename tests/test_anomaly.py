@@ -11,7 +11,6 @@ class TestFermentationAnomalyDetector:
         """Detector initializes with default parameters."""
         detector = FermentationAnomalyDetector()
 
-        assert detector.contamination == 0.05
         assert detector.min_history == 20
         assert detector.sg_rate_threshold == 0.001
 
@@ -27,7 +26,6 @@ class TestFermentationAnomalyDetector:
             result = detector.check_reading(sg, hour)
 
         # Should not have enough history yet
-        assert result["anomaly_score"] is None
         assert result["is_anomaly"] is False
         assert result["reason"] == "insufficient_history"
 
@@ -101,5 +99,4 @@ class TestFermentationAnomalyDetector:
 
         # Should need history again
         result = detector.check_reading(1.050, 0)
-        assert result["anomaly_score"] is None
         assert result["reason"] == "insufficient_history"

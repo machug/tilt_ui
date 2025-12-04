@@ -52,7 +52,6 @@ class MLPipeline:
 
         if self.config.enable_anomaly_detection:
             self.anomaly_detector = FermentationAnomalyDetector(
-                contamination=self.config.anomaly_contamination,
                 min_history=self.config.anomaly_min_history,
                 sg_rate_threshold=self.config.anomaly_sg_rate_threshold,
             )

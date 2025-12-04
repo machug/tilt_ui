@@ -20,7 +20,6 @@ class MLConfig(BaseSettings):
     kalman_measurement_noise_temp: float = 0.1
 
     # Anomaly detection
-    anomaly_contamination: float = 0.05
     anomaly_min_history: int = 20
     anomaly_sg_rate_threshold: float = 0.001  # SG/hour
 

@@ -5,55 +5,42 @@ Detects unusual patterns in gravity readings that may indicate:
 - Contamination (unusual SG increases)
 - Sensor drift or calibration issues
 
-Uses Isolation Forest for unsupervised anomaly detection combined with
-domain-specific rules (SG rate thresholds).
+Uses rule-based detection with domain-specific thresholds.
 """
 
 import numpy as np
-from sklearn.ensemble import IsolationForest
 from typing import Optional
 
 
 class FermentationAnomalyDetector:
     """Detects anomalies in fermentation gravity readings.
 
-    Combines unsupervised ML (Isolation Forest) with domain knowledge:
-    - Isolation Forest finds unusual patterns in [sg, sg_rate, time_delta]
+    Uses domain knowledge and rule-based detection:
     - SG rate threshold catches stuck fermentation (rate near zero)
     - SG increase detection flags potential contamination
+    - Temperature spike detection identifies environmental issues
 
     The detector requires a minimum history before making predictions.
     """
 
     def __init__(
         self,
-        contamination: float = 0.05,
         min_history: int = 20,
         sg_rate_threshold: float = 0.001,  # SG per hour
     ):
         """Initialize the anomaly detector.
 
         Args:
-            contamination: Expected proportion of anomalies (0.0 to 0.5)
             min_history: Minimum readings required before scoring
             sg_rate_threshold: Minimum acceptable SG decline rate (SG/hour)
                               Below this = stuck fermentation
         """
-        self.contamination = contamination
         self.min_history = min_history
         self.sg_rate_threshold = sg_rate_threshold
-
-        # Isolation Forest model
-        self.model = IsolationForest(
-            contamination=contamination,
-            random_state=42,
-            n_estimators=100,
-        )
 
         # History buffers
         self.sg_history: list[float] = []
         self.time_history: list[float] = []  # hours since start
-        self.is_fitted = False
 
     def check_reading(
         self,
@@ -80,22 +67,10 @@ class FermentationAnomalyDetector:
         # Need minimum history to make predictions
         if len(self.sg_history) < self.min_history:
             return {
-                "anomaly_score": None,
                 "is_anomaly": False,
                 "reason": "insufficient_history",
                 "sg_rate": None,
             }
-
-        # Fit model on first opportunity
-        if not self.is_fitted:
-            self._fit_model()
-
-        # Calculate features for this reading
-        features = self._extract_features()
-
-        # Get anomaly score from Isolation Forest
-        # Score is in range [-1, 1], negative = anomaly
-        score = self.model.score_samples([features])[0]
 
         # Calculate recent SG rate
         sg_rate = self._calculate_sg_rate()
@@ -134,56 +109,11 @@ class FermentationAnomalyDetector:
                 is_anomaly = True
                 reason = "stuck_fermentation"
 
-        # Isolation Forest: Disabled for now
-        # Normal fermentation data is too homogeneous (smooth exponential decay)
-        # Isolation Forest flags all readings as anomalous when trained on uniform data
-        # Future: Consider training on diverse multi-batch data or using one-class SVM
-        # elif score < -0.3:
-        #     is_anomaly = True
-        #     reason = "unusual_pattern"
-
         return {
-            "anomaly_score": float(score),
             "is_anomaly": is_anomaly,
             "reason": reason,
             "sg_rate": sg_rate,
         }
-
-    def _fit_model(self) -> None:
-        """Fit the Isolation Forest on accumulated history."""
-        # Extract features for all historical readings
-        X = []
-        for i in range(len(self.sg_history)):
-            sg = self.sg_history[i]
-            time = self.time_history[i]
-
-            # Calculate SG rate using previous reading
-            if i > 0:
-                dt = time - self.time_history[i - 1]
-                sg_rate = (sg - self.sg_history[i - 1]) / dt if dt > 0 else 0
-            else:
-                sg_rate = 0
-
-            # Feature vector: [sg, sg_rate, time_delta]
-            X.append([sg, sg_rate, time])
-
-        # Fit the model
-        self.model.fit(X)
-        self.is_fitted = True
-
-    def _extract_features(self) -> list[float]:
-        """Extract features for the most recent reading."""
-        sg = self.sg_history[-1]
-        time = self.time_history[-1]
-
-        # Calculate SG rate using previous reading
-        if len(self.sg_history) > 1:
-            dt = time - self.time_history[-2]
-            sg_rate = (sg - self.sg_history[-2]) / dt if dt > 0 else 0
-        else:
-            sg_rate = 0
-
-        return [sg, sg_rate, time]
 
     def _calculate_sg_rate(self, window: int = 5) -> Optional[float]:
         """Calculate recent SG change rate using linear regression.
@@ -219,9 +149,3 @@ class FermentationAnomalyDetector:
         """Reset detector state for a new batch."""
         self.sg_history = []
         self.time_history = []
-        self.is_fitted = False
-        self.model = IsolationForest(
-            contamination=self.contamination,
-            random_state=42,
-            n_estimators=100,
-        )

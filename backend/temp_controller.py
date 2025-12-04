@@ -245,6 +245,57 @@ async def set_heater_state_for_batch(
     return success
 
 
+async def set_cooler_state_for_batch(
+    ha_client,
+    entity_id: str,
+    state: str,
+    db,
+    batch_id: int,
+    wort_temp: float,
+    ambient_temp: Optional[float],
+    target_temp: float,
+    device_id: Optional[str],
+    force: bool = False
+) -> bool:
+    """Turn cooler on or off for a specific batch and log the event."""
+    global _batch_cooler_states
+
+    # Get batch's cooler state tracking
+    batch_state = _batch_cooler_states.get(batch_id, {})
+    last_state = batch_state.get("state")
+    last_change = batch_state.get("last_change")
+
+    # Check minimum cycle time (skip for forced changes like overrides)
+    if not force and last_change is not None:
+        elapsed = datetime.now(timezone.utc) - last_change
+        if elapsed < timedelta(minutes=MIN_CYCLE_MINUTES):
+            remaining = MIN_CYCLE_MINUTES - (elapsed.total_seconds() / 60)
+            logger.debug(f"Batch {batch_id}: Skipping cooler change to '{state}' - min cycle time not met ({remaining:.1f} min remaining)")
+            return False
+
+    logger.debug(f"Batch {batch_id}: Attempting to set cooler to '{state}' (entity: {entity_id})")
+
+    if state == "on":
+        success = await ha_client.call_service("switch", "turn_on", entity_id)
+        action = "cool_on"
+    else:
+        success = await ha_client.call_service("switch", "turn_off", entity_id)
+        action = "cool_off"
+
+    if success:
+        _batch_cooler_states[batch_id] = {
+            "state": state,
+            "last_change": datetime.now(timezone.utc),
+            "entity_id": entity_id,
+        }
+        logger.info(f"Batch {batch_id}: Cooler state changed: {last_state} -> {state}")
+        await log_control_event(db, action, wort_temp, ambient_temp, target_temp, device_id, batch_id)
+    else:
+        logger.error(f"Batch {batch_id}: Failed to set cooler to '{state}' via HA (entity: {entity_id})")
+
+    return success
+
+
 async def control_batch_heater(
     ha_client,
     batch: Batch,

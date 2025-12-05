@@ -159,20 +159,28 @@ async def _migrate_temps_fahrenheit_to_celsius(engine):
             "SELECT name FROM sqlite_master WHERE type='table' AND name='ambient_readings'"
         ))
         if result.fetchone():
-            # Check if ambient temps need conversion (>50 = Fahrenheit, ambient is typically -20 to 40°C)
+            # Sample an ambient reading to check if already converted
+            # Ambient temps in Fahrenheit are typically 32-100°F (0-38°C)
+            # If we find temps in range 32-100, assume Fahrenheit
+            # If temps are <32 (below freezing F), assume already Celsius
             result = await conn.execute(text("""
-                SELECT COUNT(*) FROM ambient_readings
-                WHERE temperature IS NOT NULL AND temperature > 50
+                SELECT temperature FROM ambient_readings
+                WHERE temperature IS NOT NULL
+                ORDER BY id DESC LIMIT 1
             """))
-            count = result.scalar()
+            row = result.fetchone()
 
-            if count > 0:
+            if row and row[0] >= 32:  # Likely Fahrenheit (32°F = 0°C)
+                result = await conn.execute(text("SELECT COUNT(*) FROM ambient_readings WHERE temperature IS NOT NULL"))
+                count = result.scalar()
                 logging.info(f"Converting {count} ambient temperature readings from Fahrenheit to Celsius")
                 await conn.execute(text("""
                     UPDATE ambient_readings
                     SET temperature = (temperature - 32) * 5.0 / 9.0
                     WHERE temperature IS NOT NULL
                 """))
+            else:
+                logging.info("Ambient temperatures already in Celsius, skipping conversion")
 
         logging.info("Temperature conversion complete")
 

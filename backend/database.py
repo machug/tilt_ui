@@ -80,11 +80,30 @@ def _migrate_add_ml_columns(conn):
 
 
 async def _migrate_temps_fahrenheit_to_celsius(engine):
-    """Convert all temperature data from Fahrenheit to Celsius."""
+    """Convert all temperature data from Fahrenheit to Celsius.
+
+    Uses explicit migration tracking via config table to prevent double-migration.
+    """
     from sqlalchemy import text
     import logging
 
     async with engine.begin() as conn:
+        # Check if config table exists
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config'"
+        ))
+        if not result.fetchone():
+            logging.info("Config table doesn't exist yet, skipping temperature migration")
+            return
+
+        # Check if migration already completed via explicit flag
+        result = await conn.execute(text(
+            "SELECT value FROM config WHERE key = 'temp_migration_v1_complete'"
+        ))
+        if result.fetchone():
+            logging.info("Temperature migration already completed (tracked via config)")
+            return
+
         # Check if readings table exists using SQLite-specific query
         result = await conn.execute(text(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='readings'"
@@ -93,7 +112,7 @@ async def _migrate_temps_fahrenheit_to_celsius(engine):
             logging.info("Readings table doesn't exist yet, skipping temperature migration")
             return
 
-        # Check if migration already applied by sampling a reading
+        # Check if migration already applied by sampling a reading (legacy heuristic)
         result = await conn.execute(text(
             "SELECT temp_raw FROM readings WHERE temp_raw IS NOT NULL LIMIT 1"
         ))
@@ -101,10 +120,18 @@ async def _migrate_temps_fahrenheit_to_celsius(engine):
 
         if not row:
             logging.info("No readings with temperature data, skipping migration")
+            # Mark as complete even if no data to prevent future attempts
+            await conn.execute(text(
+                "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+            ))
             return
 
         if row[0] < 50:  # Already in Celsius (fermentation temps are 0-40°C)
-            logging.info("Temperatures already in Celsius, skipping migration")
+            logging.info("Temperatures already in Celsius (heuristic check)")
+            # Mark as complete to prevent future heuristic checks
+            await conn.execute(text(
+                "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+            ))
             return
 
         logging.info("Converting temperatures from Fahrenheit to Celsius")
@@ -161,7 +188,12 @@ async def _migrate_temps_fahrenheit_to_celsius(engine):
 
         # NOTE: ambient_readings table is NOT converted - Home Assistant already sends Celsius
 
-        logging.info("Temperature conversion complete")
+        # Mark migration as complete
+        await conn.execute(text(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+        ))
+
+        logging.info("Temperature conversion complete and tracked in config")
 
 
 async def init_db():

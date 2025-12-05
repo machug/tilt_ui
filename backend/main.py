@@ -127,7 +127,7 @@ async def handle_tilt_reading(reading: TiltReading):
         temp_rate = None
         is_anomaly = False
         anomaly_score = None
-        anomaly_reasons = None
+        anomaly_reasons_list = []  # Keep as list in memory
         predictions = None
 
         if tilt.paired and status == "valid" and ml_pipeline_manager is not None:
@@ -157,7 +157,8 @@ async def handle_tilt_reading(reading: TiltReading):
                     is_anomaly = anomaly["is_anomaly"]
                     # Anomaly detector returns "reason" string, not "anomaly_score"
                     anomaly_score = 1.0 if is_anomaly else 0.0  # Binary score for now
-                    anomaly_reasons = json.dumps([anomaly.get("reason", "normal")])
+                    # Store reason as list to support multiple reasons in future
+                    anomaly_reasons_list = [anomaly.get("reason", "normal")]
 
                 # Predictions (may be None if not enough history)
                 predictions = ml_result.get("predictions")
@@ -171,6 +172,9 @@ async def handle_tilt_reading(reading: TiltReading):
         # Only store reading if device is paired
         if tilt.paired:
             # Store reading in DB with ML outputs
+            # Encode anomaly_reasons list as JSON for database storage
+            anomaly_reasons_json = json.dumps(anomaly_reasons_list) if anomaly_reasons_list else None
+
             db_reading = Reading(
                 tilt_id=reading.id,
                 device_id=device_id,
@@ -188,7 +192,7 @@ async def handle_tilt_reading(reading: TiltReading):
                 temp_rate=temp_rate,
                 is_anomaly=is_anomaly,
                 anomaly_score=anomaly_score,
-                anomaly_reasons=anomaly_reasons,
+                anomaly_reasons=anomaly_reasons_json,
             )
             session.add(db_reading)
 
@@ -210,7 +214,7 @@ async def handle_tilt_reading(reading: TiltReading):
             "temp_filtered": temp_filtered,
             "confidence": confidence,
             "is_anomaly": is_anomaly,
-            "anomaly_reasons": json.loads(anomaly_reasons) if anomaly_reasons else [],
+            "anomaly_reasons": anomaly_reasons_list,
             "predicted_fg": predictions.get("predicted_fg") if predictions else None,
             "hours_to_complete": predictions.get("hours_to_complete") if predictions else None,
             "rssi": reading.rssi,

@@ -646,19 +646,19 @@ onMount(async () => {
 	// Fetch system timezone for chart display
 	try {
 		const response = await fetch('/api/system/timezone');
-			if (response.ok) {
-				const data = await response.json();
-				systemTimezone = data.timezone || 'UTC';
-			}
-		} catch (e) {
-			console.warn('Failed to fetch system timezone, using UTC');
+		if (response.ok) {
+			const data = await response.json();
+			systemTimezone = data.timezone || 'UTC';
 		}
+	} catch (e) {
+		console.warn('Failed to fetch system timezone, using UTC');
+	}
 
-		// Initial load is user-triggered (mounting the component)
-		await loadData(true);
-		window.addEventListener('resize', handleResize);
-		resetRefreshInterval();
-	});
+	// Initial load is user-triggered (mounting the component)
+	await loadData(true);
+	window.addEventListener('resize', handleResize);
+	resetRefreshInterval();
+});
 
 	onDestroy(() => {
 		chart?.destroy();

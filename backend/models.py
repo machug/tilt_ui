@@ -940,16 +940,16 @@ class BatchCreate(BaseModel):
     @classmethod
     def validate_temp_target(cls, v: Optional[float]) -> Optional[float]:
         if v is not None:
-            if v < 32.0 or v > 212.0:  # Fahrenheit range (0-100°C)
-                raise ValueError("temp_target must be between 32°F and 212°F (0-100°C)")
+            if v < 0.0 or v > 100.0:  # Celsius range (32-212°F)
+                raise ValueError("temp_target must be between 0-100°C (32-212°F)")
         return v
 
     @field_validator("temp_hysteresis")
     @classmethod
     def validate_temp_hysteresis(cls, v: Optional[float]) -> Optional[float]:
         if v is not None:
-            if v < 0.1 or v > 10.0:
-                raise ValueError("temp_hysteresis must be between 0.1 and 10.0 degrees")
+            if v < 0.05 or v > 5.5:  # Celsius deltas (0.1-10°F)
+                raise ValueError("temp_hysteresis must be between 0.05-5.5°C (0.1-10°F)")
         return v
 
 
@@ -991,16 +991,16 @@ class BatchUpdate(BaseModel):
     @classmethod
     def validate_temp_target(cls, v: Optional[float]) -> Optional[float]:
         if v is not None:
-            if v < 32.0 or v > 212.0:  # Fahrenheit range (0-100°C)
-                raise ValueError("temp_target must be between 32°F and 212°F (0-100°C)")
+            if v < 0.0 or v > 100.0:  # Celsius range (32-212°F)
+                raise ValueError("temp_target must be between 0-100°C (32-212°F)")
         return v
 
     @field_validator("temp_hysteresis")
     @classmethod
     def validate_temp_hysteresis(cls, v: Optional[float]) -> Optional[float]:
         if v is not None:
-            if v < 0.1 or v > 10.0:
-                raise ValueError("temp_hysteresis must be between 0.1 and 10.0 degrees")
+            if v < 0.05 or v > 5.5:  # Celsius deltas (0.1-10°F)
+                raise ValueError("temp_hysteresis must be between 0.05-5.5°C (0.1-10°F)")
         return v
 
 

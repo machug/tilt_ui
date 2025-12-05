@@ -30,6 +30,8 @@ DEFAULT_HEATING_RATE = 1.1   # °C/hour when heater ON (~2°F/hour equivalent)
 
 # Learning algorithm parameters
 MIN_TEMP_GRADIENT = 0.1      # °C - minimum temperature difference for valid coefficient calculation
+MAX_AMBIENT_COEFF = 10.0     # Maximum reasonable ambient coefficient (prevents division-by-near-zero issues)
+MAX_COOLING_RATE = 10.0      # °C/hour - maximum reasonable cooling rate for typical fermentation chambers
 
 # Cost function parameters for MPC optimization
 OVERSHOOT_PENALTY_MULTIPLIER = 10  # Heavily penalize temperature overshoot
@@ -169,7 +171,8 @@ class MPCTemperatureController:
                 # Avoid division by near-zero
                 if abs(temp_diff) > MIN_TEMP_GRADIENT:
                     coeff = -rate / temp_diff
-                    if coeff > 0:  # Sanity check
+                    # Sanity check: coefficient should be positive and reasonable
+                    if 0 < coeff < MAX_AMBIENT_COEFF:
                         coeffs.append(coeff)
 
             self.ambient_coeff = float(np.median(coeffs)) if coeffs else DEFAULT_AMBIENT_COEFF
@@ -196,7 +199,8 @@ class MPCTemperatureController:
             net_cooling_rates = []
             for rate, temp_diff in cooling_rates:
                 net_rate = -rate - self.ambient_coeff * temp_diff
-                if net_rate > 0:  # Sanity check (cooling_rate should be positive)
+                # Sanity check: cooling_rate should be positive and reasonable
+                if 0 < net_rate < MAX_COOLING_RATE:
                     net_cooling_rates.append(net_rate)
 
             if net_cooling_rates:
@@ -313,15 +317,20 @@ class MPCTemperatureController:
                 ambient_temp
             )
 
-            # Calculate cost: penalize distance from target and overshoot
+            # Calculate cost: penalize distance from target
+            # Asymmetric penalty prevents overshoot in heating mode
+            # For fermentation, overshooting temperature (too hot) damages yeast more than undershooting
             cost = 0
             for temp in trajectory:
                 error = temp - target_temp
+
                 if error > 0:
-                    # Overshoot: heavily penalize
+                    # Above target: heavily penalize (overshoot risk)
+                    # This applies equally in heating and cooling modes
                     cost += error ** 2 * OVERSHOOT_PENALTY_MULTIPLIER
                 else:
                     # Below target: normal penalty
+                    # Undershoot is less critical for fermentation
                     cost += error ** 2
 
             # Small penalty for switching state (reduce cycling)

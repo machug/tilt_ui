@@ -21,7 +21,6 @@ from ..models import Device, Reading, serialize_datetime_to_utc
 from ..state import latest_readings
 from ..websocket import manager as ws_manager
 from .calibration import calibration_service
-from .smoothing import smoothing_service
 from ..routers.config import get_config_value
 
 logger = logging.getLogger(__name__)
@@ -42,9 +41,6 @@ class IngestManager:
         # Cache for config values to avoid DB query on every reading
         self._min_rssi_cache: Optional[int] = None
         self._min_rssi_cache_time: float = 0
-        self._smoothing_enabled_cache: Optional[bool] = None
-        self._smoothing_samples_cache: Optional[int] = None
-        self._smoothing_cache_time: float = 0
 
     async def _get_min_rssi(self, db: AsyncSession) -> Optional[int]:
         """Get min_rssi config with caching to reduce DB queries."""
@@ -53,15 +49,6 @@ class IngestManager:
             self._min_rssi_cache = await get_config_value(db, "min_rssi")
             self._min_rssi_cache_time = now
         return self._min_rssi_cache
-
-    async def _get_smoothing_config(self, db: AsyncSession) -> tuple[bool, Optional[int]]:
-        """Get smoothing config with caching to reduce DB queries."""
-        now = time.monotonic()
-        if now - self._smoothing_cache_time > CONFIG_CACHE_TTL:
-            self._smoothing_enabled_cache = await get_config_value(db, "smoothing_enabled")
-            self._smoothing_samples_cache = await get_config_value(db, "smoothing_samples")
-            self._smoothing_cache_time = now
-        return self._smoothing_enabled_cache or False, self._smoothing_samples_cache
 
     async def ingest(
         self,
@@ -115,35 +102,21 @@ class IngestManager:
         # Step 6: Apply device calibration
         reading = await calibration_service.calibrate_device_reading(db, device, reading)
 
-        # Step 7: Validate reading for outliers (BEFORE smoothing to prevent contamination)
+        # Step 7: Validate reading for outliers
         # Validation happens in _store_reading() which calls _validate_reading()
         # Store reading will mark as invalid if outside valid ranges
 
-        # Step 8: Apply smoothing if enabled (only for valid readings)
-        # We need to check status first before smoothing
-        temp_status = self._validate_reading(reading)
-        if temp_status == ReadingStatus.VALID.value:
-            smoothing_enabled, smoothing_samples = await self._get_smoothing_config(db)
-            if smoothing_enabled and smoothing_samples and smoothing_samples > 1:
-                # Apply smoothing to calibrated values
-                sg_smoothed, temp_smoothed = await smoothing_service.smooth_reading(
-                    db, device.id, reading.gravity, reading.temperature, smoothing_samples
-                )
-                # Update reading with smoothed values
-                reading.gravity = sg_smoothed
-                reading.temperature = temp_smoothed
-
-        # Step 9: Store reading in database
+        # Step 8: Store reading in database
         db_reading = await self._store_reading(db, device, reading)
 
-        # Step 10: Update device last_seen
+        # Step 9: Update device last_seen
         device.last_seen = reading.timestamp
         if reading.battery_voltage is not None:
             device.battery_voltage = reading.battery_voltage
 
         await db.commit()
 
-        # Step 11: Broadcast via WebSocket
+        # Step 10: Broadcast via WebSocket
         await self._broadcast_reading(device, reading)
 
         logger.info(

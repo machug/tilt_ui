@@ -279,6 +279,30 @@ mcp__chrome-devtools__list_network_requests
 3. Document any Fahrenheit values in comments as "for Tilt BLE compatibility only"
 4. Never hardcode temperature values - use config or calculations
 
+### ML Pipeline Integration
+
+**Per-Device Pipelines:** Each device maintains independent ML state via `MLPipelineManager`
+
+**Components:**
+- **Kalman Filtering:** Replaces legacy smoothing service, provides optimal state estimation
+- **Anomaly Detection:** Flags readings with `is_anomaly` based on fermentation physics
+- **Predictions:** Estimates final gravity and completion time after sufficient history
+
+**Data Flow:**
+```
+Tilt Reading (F) → F→C Conversion → Calibration (C) → ML Pipeline (C) → Store (C) → Broadcast (C)
+```
+
+**ML Outputs Stored:**
+- `sg_filtered`, `temp_filtered` - Kalman filtered values
+- `confidence` - Reading quality (0.0-1.0)
+- `sg_rate`, `temp_rate` - Derivatives for trend analysis
+- `is_anomaly`, `anomaly_score`, `anomaly_reasons` - Anomaly detection
+
+**Error Handling:** ML failures degrade gracefully to calibrated values, system continues operating.
+
+**Frontend Impact:** All ML data available via WebSocket for UI enhancements.
+
 ### Device Pairing System
 
 Devices (Tilts) must be **paired** before logging readings. This prevents data pollution from nearby devices.

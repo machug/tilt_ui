@@ -25,20 +25,47 @@ from .cleanup import CleanupService  # noqa: E402
 from .scanner import TiltReading, TiltScanner  # noqa: E402
 from .services.calibration import calibration_service  # noqa: E402
 from .services.batch_linker import link_reading_to_batch  # noqa: E402
-from .services.smoothing import smoothing_service  # noqa: E402
 from .state import latest_readings  # noqa: E402
 from .websocket import manager  # noqa: E402
+from .ml.pipeline_manager import MLPipelineManager  # noqa: E402
 import time  # noqa: E402
+import json  # noqa: E402
 
 # Global scanner instance
 scanner: Optional[TiltScanner] = None
 scanner_task: Optional[asyncio.Task] = None
-
-# Config cache for BLE reading handler (avoid DB query on every reading)
-_smoothing_config_cache: tuple[bool, Optional[int]] = (False, None)
-_smoothing_cache_time: float = 0
-CONFIG_CACHE_TTL = 30  # seconds
 cleanup_service: Optional[CleanupService] = None
+
+# Global ML pipeline manager
+ml_pipeline_manager: Optional[MLPipelineManager] = None
+
+
+async def calculate_time_since_batch_start(session, batch_id: Optional[int]) -> float:
+    """Calculate hours since batch start.
+
+    Args:
+        session: Database session
+        batch_id: Batch ID
+
+    Returns:
+        Hours since batch start_time (0.0 if no batch or no start_time)
+    """
+    if not batch_id:
+        return 0.0
+
+    batch = await session.get(models.Batch, batch_id)
+    if not batch or not batch.start_time:
+        return 0.0
+
+    now = datetime.now(timezone.utc)
+    start_time = batch.start_time
+
+    # Handle naive datetime (database stores in UTC but without timezone info)
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+
+    delta = now - start_time
+    return delta.total_seconds() / 3600.0  # Convert to hours
 
 
 async def handle_tilt_reading(reading: TiltReading):
@@ -59,72 +86,120 @@ async def handle_tilt_reading(reading: TiltReading):
         tilt.last_seen = datetime.now(timezone.utc)
         tilt.mac = reading.mac
 
-        # Apply calibration
-        sg_calibrated, temp_calibrated = await calibration_service.calibrate_reading(
-            session, reading.id, reading.sg, reading.temp_f
+        # Convert Tilt's Fahrenheit to Celsius immediately
+        temp_raw_c = (reading.temp_f - 32) * 5.0 / 9.0
+
+        # Apply calibration in Celsius
+        sg_calibrated, temp_calibrated_c = await calibration_service.calibrate_reading(
+            session, reading.id, reading.sg, temp_raw_c
         )
 
         # Validate reading for outliers (physical impossibility check)
         # Valid SG range: 0.500-1.200 (beer is typically 1.000-1.120)
-        # Valid temp range: 32-212°F (freezing to boiling)
-        # IMPORTANT: Validate BEFORE smoothing to prevent invalid readings from polluting the moving average buffer
+        # Valid temp range: 0-100°C (freezing to boiling)
+        # IMPORTANT: Validate BEFORE ML processing to prevent invalid readings from polluting the Kalman filter
         status = "valid"
         if not (0.500 <= sg_calibrated <= 1.200):
             status = "invalid"
             logging.warning(
                 f"Outlier SG detected: {sg_calibrated:.4f} (valid: 0.500-1.200) for device {reading.id}"
             )
-        elif not (32.0 <= temp_calibrated <= 212.0):
+        elif not (0.0 <= temp_calibrated_c <= 100.0):
             status = "invalid"
             logging.warning(
-                f"Outlier temperature detected: {temp_calibrated:.1f}°F (valid: 32-212) for device {reading.id}"
+                f"Outlier temperature detected: {temp_calibrated_c:.1f}°C (valid: 0-100) for device {reading.id}"
             )
 
-        # Apply smoothing if enabled (only for valid readings)
-        if status == "valid":
-            global _smoothing_config_cache, _smoothing_cache_time
-            now = time.monotonic()
+        # Link reading to batch (if paired) - calculate once and reuse
+        device_id = reading.id
+        batch_id = None
+        time_hours = 0.0
 
-            # Refresh cache if expired
-            if now - _smoothing_cache_time > CONFIG_CACHE_TTL:
-                smoothing_enabled = await get_config_value(session, "smoothing_enabled")
-                smoothing_samples = await get_config_value(session, "smoothing_samples")
-                _smoothing_config_cache = (smoothing_enabled or False, smoothing_samples)
-                _smoothing_cache_time = now
-            else:
-                smoothing_enabled, smoothing_samples = _smoothing_config_cache
+        if tilt.paired:
+            batch_id = await link_reading_to_batch(session, device_id)
+            time_hours = await calculate_time_since_batch_start(session, batch_id)
 
-            if smoothing_enabled and smoothing_samples and smoothing_samples > 1:
-                sg_calibrated, temp_calibrated = await smoothing_service.smooth_reading(
-                    session, reading.id, sg_calibrated, temp_calibrated, smoothing_samples
+        # Process through ML pipeline if paired and valid
+        sg_filtered = sg_calibrated
+        temp_filtered = temp_calibrated_c
+        confidence = None
+        sg_rate = None
+        temp_rate = None
+        is_anomaly = False
+        anomaly_score = None
+        anomaly_reasons_list = []  # Keep as list in memory
+        predictions = None
+
+        if tilt.paired and status == "valid" and ml_pipeline_manager is not None:
+            # Get or create pipeline for this device
+            pipeline = ml_pipeline_manager.get_or_create_pipeline(reading.id)
+
+            # Process through ML pipeline
+            try:
+                ml_result = pipeline.process_reading(
+                    sg=sg_calibrated,
+                    temp=temp_calibrated_c,
+                    rssi=reading.rssi,
+                    time_hours=time_hours,
                 )
+
+                # Extract ML outputs
+                if ml_result.get("kalman"):
+                    sg_filtered = ml_result["kalman"]["sg_filtered"]
+                    temp_filtered = ml_result["kalman"]["temp_filtered"]
+                    confidence = ml_result["kalman"]["confidence"]
+                    sg_rate = ml_result["kalman"]["sg_rate"]
+                    temp_rate = ml_result["kalman"]["temp_rate"]
+
+                # Anomaly detection
+                if ml_result.get("anomaly"):
+                    anomaly = ml_result["anomaly"]
+                    is_anomaly = anomaly["is_anomaly"]
+                    # Anomaly detector returns "reason" string, not "anomaly_score"
+                    anomaly_score = 1.0 if is_anomaly else 0.0  # Binary score for now
+                    # Store reason as list to support multiple reasons in future
+                    anomaly_reasons_list = [anomaly.get("reason", "normal")]
+
+                # Predictions (may be None if not enough history)
+                predictions = ml_result.get("predictions")
+
+            except Exception as e:
+                logging.error(f"ML pipeline error for {reading.id}: {e}")
+                # Fallback: use calibrated values (graceful degradation)
+                sg_filtered = sg_calibrated
+                temp_filtered = temp_calibrated_c
 
         # Only store reading if device is paired
         if tilt.paired:
-            # Device ID for Tilts is the same as tilt_id (e.g., "tilt-red")
-            device_id = reading.id
+            # Store reading in DB with ML outputs
+            # Encode anomaly_reasons list as JSON for database storage
+            anomaly_reasons_json = json.dumps(anomaly_reasons_list) if anomaly_reasons_list else None
 
-            # Link to active batch if one exists for this device
-            batch_id = await link_reading_to_batch(session, device_id)
-
-            # Store reading in DB
             db_reading = Reading(
                 tilt_id=reading.id,
                 device_id=device_id,
                 batch_id=batch_id,
                 sg_raw=reading.sg,
                 sg_calibrated=sg_calibrated,
-                temp_raw=reading.temp_f,
-                temp_calibrated=temp_calibrated,
+                sg_filtered=sg_filtered,
+                temp_raw=temp_raw_c,
+                temp_calibrated=temp_calibrated_c,
+                temp_filtered=temp_filtered,
                 rssi=reading.rssi,
-                status=status,  # Mark as valid or invalid
+                status=status,
+                confidence=confidence,
+                sg_rate=sg_rate,
+                temp_rate=temp_rate,
+                is_anomaly=is_anomaly,
+                anomaly_score=anomaly_score,
+                anomaly_reasons=anomaly_reasons_json,
             )
             session.add(db_reading)
 
         await session.commit()
 
         # Build reading data for WebSocket broadcast (always broadcast)
-        # Temperatures are in Fahrenheit (from Tilt devices)
+        # Temperatures are in Celsius (converted from Tilt's Fahrenheit)
         # Frontend will convert based on user preference
         reading_data = {
             "id": reading.id,
@@ -133,8 +208,15 @@ async def handle_tilt_reading(reading: TiltReading):
             "original_gravity": tilt.original_gravity,
             "sg": sg_calibrated,
             "sg_raw": reading.sg,
-            "temp": temp_calibrated,
-            "temp_raw": reading.temp_f,
+            "sg_filtered": sg_filtered,
+            "temp": temp_calibrated_c,
+            "temp_raw": temp_raw_c,
+            "temp_filtered": temp_filtered,
+            "confidence": confidence,
+            "is_anomaly": is_anomaly,
+            "anomaly_reasons": anomaly_reasons_list,
+            "predicted_fg": predictions.get("predicted_fg") if predictions else None,
+            "hours_to_complete": predictions.get("hours_to_complete") if predictions else None,
             "rssi": reading.rssi,
             "last_seen": serialize_datetime_to_utc(datetime.now(timezone.utc)),
             "paired": tilt.paired,  # Include pairing status
@@ -149,12 +231,16 @@ async def handle_tilt_reading(reading: TiltReading):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global scanner, scanner_task, cleanup_service
+    global scanner, scanner_task, cleanup_service, ml_pipeline_manager
 
     # Startup
     print("Starting BrewSignal...")
     await init_db()
     print("Database initialized")
+
+    # Initialize ML pipeline manager
+    ml_pipeline_manager = MLPipelineManager()
+    logging.info("ML Pipeline Manager initialized")
 
     # Start scanner
     scanner = TiltScanner(on_reading=handle_tilt_reading)
@@ -189,6 +275,7 @@ async def lifespan(app: FastAPI):
             await scanner_task
         except asyncio.CancelledError:
             pass
+    ml_pipeline_manager = None
     print("Scanner stopped")
 
 

@@ -506,10 +506,11 @@
 			timestamps.push(parseUtcTimestamp(r.timestamp));
 			sgValues.push(r.sg_calibrated ?? r.sg_raw);
 
-			// Convert temp if needed
-			const tempF = r.temp_calibrated ?? r.temp_raw;
-			if (tempF !== null) {
-				tempValues.push(celsius ? fahrenheitToCelsius(tempF) : tempF);
+			// Temperature is already in Celsius from API (since PR #66)
+			// Convert to Fahrenheit only if user preference is F
+			const temp = r.temp_calibrated ?? r.temp_raw;
+			if (temp !== null) {
+				tempValues.push(celsius ? temp : (temp * 9 / 5) + 32);
 			} else {
 				tempValues.push(null);
 			}

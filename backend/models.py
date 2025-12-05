@@ -146,6 +146,20 @@ class Reading(Base):
     status: Mapped[str] = mapped_column(String(20), default="valid")
     is_pre_filtered: Mapped[bool] = mapped_column(default=False)
 
+    # ML outputs - Kalman filtered values (Celsius)
+    sg_filtered: Mapped[Optional[float]] = mapped_column()
+    temp_filtered: Mapped[Optional[float]] = mapped_column()
+
+    # ML outputs - Confidence and rates
+    confidence: Mapped[Optional[float]] = mapped_column()  # 0.0-1.0
+    sg_rate: Mapped[Optional[float]] = mapped_column()     # d(SG)/dt in points/hour
+    temp_rate: Mapped[Optional[float]] = mapped_column()   # d(temp)/dt in °C/hour
+
+    # ML outputs - Anomaly detection
+    is_anomaly: Mapped[Optional[bool]] = mapped_column(default=False)
+    anomaly_score: Mapped[Optional[float]] = mapped_column()  # 0.0-1.0
+    anomaly_reasons: Mapped[Optional[str]] = mapped_column(Text)  # JSON array
+
     # Relationships
     tilt: Mapped[Optional["Tilt"]] = relationship(back_populates="readings")
     device: Mapped[Optional["Device"]] = relationship(back_populates="readings")
@@ -559,6 +573,16 @@ class ReadingResponse(BaseModel):
     temp_calibrated: Optional[float]
     rssi: Optional[int]
     status: Optional[str] = None  # 'valid', 'invalid', 'uncalibrated', 'incomplete'
+
+    # ML outputs
+    sg_filtered: Optional[float] = None
+    temp_filtered: Optional[float] = None
+    confidence: Optional[float] = None
+    sg_rate: Optional[float] = None
+    temp_rate: Optional[float] = None
+    is_anomaly: Optional[bool] = None
+    anomaly_score: Optional[float] = None
+    anomaly_reasons: Optional[str] = None
 
     @field_serializer('timestamp')
     def serialize_dt(self, dt: datetime) -> str:

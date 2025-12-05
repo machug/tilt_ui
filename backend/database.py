@@ -33,6 +33,178 @@ def _migrate_add_batch_id_to_readings(conn):
         print("Migration: Added batch_id column to readings table")
 
 
+def _migrate_add_ml_columns(conn):
+    """Add ML output columns to readings table."""
+    from sqlalchemy import inspect, text
+    import logging
+    inspector = inspect(conn)
+
+    if "readings" not in inspector.get_table_names():
+        return  # Fresh install, create_all will handle it
+
+    columns = [c["name"] for c in inspector.get_columns("readings")]
+
+    if "sg_filtered" in columns:
+        logging.info("ML columns already exist, skipping migration")
+        return
+
+    logging.info("Adding ML output columns to readings table")
+
+    # Add ML columns
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN sg_filtered REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN temp_filtered REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN confidence REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN sg_rate REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN temp_rate REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN is_anomaly INTEGER DEFAULT 0
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN anomaly_score REAL
+    """))
+    conn.execute(text("""
+        ALTER TABLE readings ADD COLUMN anomaly_reasons TEXT
+    """))
+
+    logging.info("ML columns added successfully")
+
+
+async def _migrate_temps_fahrenheit_to_celsius(engine):
+    """Convert all temperature data from Fahrenheit to Celsius.
+
+    Uses explicit migration tracking via config table to prevent double-migration.
+    """
+    from sqlalchemy import text
+    import logging
+
+    async with engine.begin() as conn:
+        # Check if config table exists
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config'"
+        ))
+        if not result.fetchone():
+            logging.info("Config table doesn't exist yet, skipping temperature migration")
+            return
+
+        # Check if migration already completed via explicit flag
+        result = await conn.execute(text(
+            "SELECT value FROM config WHERE key = 'temp_migration_v1_complete'"
+        ))
+        if result.fetchone():
+            logging.info("Temperature migration already completed (tracked via config)")
+            return
+
+        # Check if readings table exists using SQLite-specific query
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='readings'"
+        ))
+        if not result.fetchone():
+            logging.info("Readings table doesn't exist yet, skipping temperature migration")
+            return
+
+        # Check if migration already applied by sampling a reading (legacy heuristic)
+        result = await conn.execute(text(
+            "SELECT temp_raw FROM readings WHERE temp_raw IS NOT NULL LIMIT 1"
+        ))
+        row = result.fetchone()
+
+        if not row:
+            logging.info("No readings with temperature data, skipping migration")
+            # Mark as complete even if no data to prevent future attempts
+            await conn.execute(text(
+                "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+            ))
+            return
+
+        if row[0] < 50:  # Already in Celsius (fermentation temps are 0-40°C)
+            logging.info("Temperatures already in Celsius (heuristic check)")
+            # Mark as complete to prevent future heuristic checks
+            await conn.execute(text(
+                "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+            ))
+            return
+
+        logging.info("Converting temperatures from Fahrenheit to Celsius")
+
+        # Convert readings table
+        await conn.execute(text("""
+            UPDATE readings
+            SET
+                temp_raw = (temp_raw - 32) * 5.0 / 9.0,
+                temp_calibrated = (temp_calibrated - 32) * 5.0 / 9.0
+            WHERE temp_raw IS NOT NULL OR temp_calibrated IS NOT NULL
+        """))
+
+        # Convert calibration points (only if table exists)
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='calibration_points'"
+        ))
+        if result.fetchone():
+            await conn.execute(text("""
+                UPDATE calibration_points
+                SET
+                    raw_value = (raw_value - 32) * 5.0 / 9.0,
+                    actual_value = (actual_value - 32) * 5.0 / 9.0
+                WHERE type = 'temp'
+            """))
+
+        # Convert batch temperature fields (only if table exists)
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='batches'"
+        ))
+        if result.fetchone():
+            # Check if any batch has temperature values that need conversion
+            # Detect Fahrenheit: temp_target >= 50 OR temp_hysteresis > 10
+            # (50°F = 10°C is the boundary - lagers can ferment at 50°F)
+            # (Hysteresis >10 must be Fahrenheit since typical values are 0.5-5°C / 1-9°F)
+            result = await conn.execute(text("""
+                SELECT COUNT(*) FROM batches
+                WHERE (temp_target IS NOT NULL AND temp_target >= 50)
+                   OR (temp_hysteresis IS NOT NULL AND temp_hysteresis > 10)
+            """))
+            count = result.scalar()
+
+            if count > 0:
+                logging.info(f"Converting {count} batch temperature fields from Fahrenheit to Celsius")
+                # Convert temp_target (absolute temperature): (F - 32) * 5/9
+                # Convert temp_hysteresis (temperature delta): F * 5/9 (no -32 offset)
+                await conn.execute(text("""
+                    UPDATE batches
+                    SET
+                        temp_target = CASE
+                            WHEN temp_target IS NOT NULL AND temp_target >= 50
+                            THEN (temp_target - 32) * 5.0 / 9.0
+                            ELSE temp_target
+                        END,
+                        temp_hysteresis = CASE
+                            WHEN temp_hysteresis IS NOT NULL AND temp_hysteresis > 10
+                            THEN temp_hysteresis * 5.0 / 9.0
+                            ELSE temp_hysteresis
+                        END
+                    WHERE (temp_target IS NOT NULL AND temp_target >= 50)
+                       OR (temp_hysteresis IS NOT NULL AND temp_hysteresis > 10)
+                """))
+
+        # NOTE: ambient_readings table is NOT converted - Home Assistant already sends Celsius
+
+        # Mark migration as complete
+        await conn.execute(text(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('temp_migration_v1_complete', 'true')"
+        ))
+
+        logging.info("Temperature conversion complete and tracked in config")
+
+
 async def init_db():
     """Initialize database with migrations.
 
@@ -51,6 +223,7 @@ async def init_db():
         await conn.run_sync(_migrate_create_devices_table)
         await conn.run_sync(_migrate_add_reading_columns)
         await conn.run_sync(_migrate_readings_nullable_tilt_id)
+        await conn.run_sync(_migrate_add_ml_columns)
 
         # Step 2: Create any missing tables (includes new Style, Recipe, Batch tables)
         await conn.run_sync(Base.metadata.create_all)
@@ -68,6 +241,10 @@ async def init_db():
         await conn.run_sync(_migrate_add_deleted_at)  # Add soft delete support to batches
         await conn.run_sync(_migrate_add_deleted_at_index)  # Add index on deleted_at column
 
+    # Convert temperatures F→C (runs outside conn.begin() context since it has its own)
+    await _migrate_temps_fahrenheit_to_celsius(engine)
+
+    async with engine.begin() as conn:
         # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
         await conn.run_sync(_migrate_mark_outliers_invalid)  # Mark historical outliers
@@ -432,6 +609,13 @@ async def _migrate_add_cooler_entity():
     """Add cooler_entity_id column to batches table."""
     from sqlalchemy import text
     async with engine.begin() as conn:
+        # Check if batches table exists
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='batches'"
+        ))
+        if not result.fetchone():
+            return  # Fresh install, create_all will handle it
+
         # Check if column exists
         result = await conn.execute(text("PRAGMA table_info(batches)"))
         columns = {row[1] for row in result}

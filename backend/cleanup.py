@@ -106,10 +106,6 @@ class CleanupService:
         while self._running:
             try:
                 await cleanup_old_readings(self.retention_days)
-
-                # Also clean up inactive smoothing buffers
-                from .services.smoothing import smoothing_service
-                smoothing_service.cleanup_inactive_buffers(max_age_seconds=3600)
             except Exception as e:
                 logger.exception("Cleanup error: %s", e)
 

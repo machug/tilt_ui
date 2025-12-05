@@ -112,15 +112,20 @@ export function celsiusToFahrenheit(c: number): number {
 	return c * (9 / 5) + 32;
 }
 
-export function formatTemp(tempF: number, units: 'C' | 'F' = configState.config.temp_units): string {
-	if (units === 'C') {
-		return fahrenheitToCelsius(tempF).toFixed(1);
+export function formatTemp(tempC: number, units?: 'C' | 'F'): string {
+	// Backend now sends temperatures in Celsius
+	// Default to user preference, fallback to Celsius if not yet loaded
+	const displayUnits = units ?? configState.config.temp_units ?? 'C';
+
+	if (displayUnits === 'F') {
+		return celsiusToFahrenheit(tempC).toFixed(1);
 	}
-	return tempF.toFixed(1);
+	return tempC.toFixed(1);
 }
 
 export function getTempUnit(): string {
-	return configState.config.temp_units === 'C' ? '°C' : '°F';
+	const units = configState.config.temp_units ?? 'C';
+	return units === 'C' ? '°C' : '°F';
 }
 
 // Gravity unit conversion utilities

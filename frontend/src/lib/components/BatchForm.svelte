@@ -26,48 +26,48 @@
 	let notes = $state(batch?.notes || '');
 
 	// Temperature control fields
-	// Backend stores temps in F, convert for display based on user preference
+	// Backend stores temps in Celsius (standardized after ML integration)
 	let heaterEntityId = $state(batch?.heater_entity_id || '');
 	let coolerEntityId = $state(batch?.cooler_entity_id || '');
 
-	// Helper to convert backend F value to display value (F or C based on preference)
-	function tempToDisplay(tempF: number | null | undefined): string {
-		if (tempF === null || tempF === undefined) return '';
-		if (configState.config.temp_units === 'C') {
-			return fahrenheitToCelsius(tempF).toFixed(1);
+	// Helper to convert backend C value to display value (F or C based on preference)
+	function tempToDisplay(tempC: number | null | undefined): string {
+		if (tempC === null || tempC === undefined) return '';
+		if (configState.config.temp_units === 'F') {
+			return celsiusToFahrenheit(tempC).toFixed(1);
 		}
-		return tempF.toFixed(1);
+		return tempC.toFixed(1);
 	}
 
-	// Helper to convert temperature DELTA (difference) from F to display unit
-	// For deltas: ΔC = ΔF × 5/9 (no offset subtraction)
-	function tempDeltaToDisplay(deltaF: number | null | undefined): string {
-		if (deltaF === null || deltaF === undefined) return '';
-		if (configState.config.temp_units === 'C') {
-			return (deltaF * 5 / 9).toFixed(1);
+	// Helper to convert temperature DELTA (difference) from C to display unit
+	// For deltas: ΔF = ΔC × 9/5 (no offset addition)
+	function tempDeltaToDisplay(deltaC: number | null | undefined): string {
+		if (deltaC === null || deltaC === undefined) return '';
+		if (configState.config.temp_units === 'F') {
+			return (deltaC * 9 / 5).toFixed(1);
 		}
-		return deltaF.toFixed(1);
+		return deltaC.toFixed(1);
 	}
 
-	// Helper to convert display value back to F for backend
-	function displayToTempF(displayValue: string): number | undefined {
+	// Helper to convert display value back to C for backend
+	function displayToTempC(displayValue: string): number | undefined {
 		if (!displayValue) return undefined;
 		const num = parseFloat(displayValue);
 		if (isNaN(num)) return undefined;
-		if (configState.config.temp_units === 'C') {
-			return celsiusToFahrenheit(num);
+		if (configState.config.temp_units === 'F') {
+			return fahrenheitToCelsius(num);
 		}
 		return num;
 	}
 
-	// Helper to convert display delta back to F delta for backend
-	// For deltas: ΔF = ΔC × 9/5 (no offset addition)
-	function displayToTempDeltaF(displayValue: string): number | undefined {
+	// Helper to convert display delta back to C delta for backend
+	// For deltas: ΔC = ΔF × 5/9 (no offset subtraction)
+	function displayToTempDeltaC(displayValue: string): number | undefined {
 		if (!displayValue) return undefined;
 		const num = parseFloat(displayValue);
 		if (isNaN(num)) return undefined;
-		if (configState.config.temp_units === 'C') {
-			return num * 9 / 5;
+		if (configState.config.temp_units === 'F') {
+			return num * 5 / 9;
 		}
 		return num;
 	}
@@ -186,11 +186,11 @@
 				brew_date: brewDate ? new Date(brewDate).toISOString() : undefined,
 				measured_og: measuredOg ? parseFloat(measuredOg) : undefined,
 				notes: notes || undefined,
-				// Temperature control - convert display values back to F for backend
+				// Temperature control - convert display values back to C for backend
 				heater_entity_id: heaterEntityId || undefined,
 				cooler_entity_id: coolerEntityId || undefined,
-				temp_target: displayToTempF(tempTarget),
-				temp_hysteresis: displayToTempDeltaF(tempHysteresis)
+				temp_target: displayToTempC(tempTarget),
+				temp_hysteresis: displayToTempDeltaC(tempHysteresis)
 			};
 
 			// Set recipe_id for both create and update

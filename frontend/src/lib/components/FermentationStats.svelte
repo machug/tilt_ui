@@ -5,8 +5,8 @@
 	// Valid ranges for outlier filtering (matches backend)
 	const SG_MIN = 0.5;
 	const SG_MAX = 1.2;
-	const TEMP_MIN_F = 32; // Fahrenheit
-	const TEMP_MAX_F = 212;
+	const TEMP_MIN_C = 0; // Celsius (API returns Celsius since PR #66)
+	const TEMP_MAX_C = 100;
 
 	// Percentile helper - filters out noise spikes from High/Low stats
 	function percentile(arr: number[], p: number): number {
@@ -70,10 +70,10 @@
 			.map((r) => r.sg_calibrated ?? r.sg_raw)
 			.filter((v): v is number => v !== null && v >= SG_MIN && v <= SG_MAX);
 
-		// Temp values (prefer calibrated, in Fahrenheit from backend, filter outliers)
+		// Temp values (prefer calibrated, in Celsius from API since PR #66, filter outliers)
 		const tempValues = sorted
 			.map((r) => r.temp_calibrated ?? r.temp_raw)
-			.filter((v): v is number => v !== null && v >= TEMP_MIN_F && v <= TEMP_MAX_F);
+			.filter((v): v is number => v !== null && v >= TEMP_MIN_C && v <= TEMP_MAX_C);
 
 		if (sgValues.length === 0) {
 			return null;
@@ -101,16 +101,18 @@
 		let lowTemp: number | null = null;
 
 		if (tempValues.length > 0) {
-			const lastTempF = tempValues[tempValues.length - 1];
-			const avgTempF = tempValues.reduce((a, b) => a + b, 0) / tempValues.length;
+			// Temperature is already in Celsius from API (since PR #66)
+			const lastTempC = tempValues[tempValues.length - 1];
+			const avgTempC = tempValues.reduce((a, b) => a + b, 0) / tempValues.length;
 			// Use percentiles for High/Low to filter noise
-			const highTempF = percentile(tempValues, 95);
-			const lowTempF = percentile(tempValues, 5);
+			const highTempC = percentile(tempValues, 95);
+			const lowTempC = percentile(tempValues, 5);
 
-			currentTemp = useCelsius ? fahrenheitToCelsius(lastTempF) : lastTempF;
-			avgTemp = useCelsius ? fahrenheitToCelsius(avgTempF) : avgTempF;
-			highTemp = useCelsius ? fahrenheitToCelsius(highTempF) : highTempF;
-			lowTemp = useCelsius ? fahrenheitToCelsius(lowTempF) : lowTempF;
+			// Convert to F only if user preference is Fahrenheit
+			currentTemp = useCelsius ? lastTempC : (lastTempC * 9 / 5) + 32;
+			avgTemp = useCelsius ? avgTempC : (avgTempC * 9 / 5) + 32;
+			highTemp = useCelsius ? highTempC : (highTempC * 9 / 5) + 32;
+			lowTemp = useCelsius ? lowTempC : (lowTempC * 9 / 5) + 32;
 		}
 
 		// Days at current SG (find when SG last changed by >0.001)

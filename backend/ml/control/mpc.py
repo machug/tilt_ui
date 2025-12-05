@@ -24,6 +24,17 @@ import logging
 import numpy as np
 from typing import Optional
 
+# Default thermal model parameters for typical fermentation chamber
+DEFAULT_AMBIENT_COEFF = 0.1  # °C/hour per degree difference from ambient
+DEFAULT_HEATING_RATE = 1.1   # °C/hour when heater ON (~2°F/hour equivalent)
+
+# Learning algorithm parameters
+MIN_TEMP_GRADIENT = 0.1      # °C - minimum temperature difference for valid coefficient calculation
+
+# Cost function parameters for MPC optimization
+OVERSHOOT_PENALTY_MULTIPLIER = 10  # Heavily penalize temperature overshoot
+STATE_CHANGE_PENALTY = 0.1         # Small penalty for switching heater/cooler state
+
 
 class MPCTemperatureController:
     """Model Predictive Controller for fermentation temperature.
@@ -155,14 +166,15 @@ class MPCTemperatureController:
             # ambient_coeff = -rate / temp_above_ambient
             coeffs = []
             for rate, temp_diff in coeff_sources:
-                if abs(temp_diff) > 0.1:  # Avoid division by near-zero
+                # Avoid division by near-zero
+                if abs(temp_diff) > MIN_TEMP_GRADIENT:
                     coeff = -rate / temp_diff
                     if coeff > 0:  # Sanity check
                         coeffs.append(coeff)
 
-            self.ambient_coeff = float(np.median(coeffs)) if coeffs else 0.1
+            self.ambient_coeff = float(np.median(coeffs)) if coeffs else DEFAULT_AMBIENT_COEFF
         else:
-            self.ambient_coeff = 0.1  # Default fallback
+            self.ambient_coeff = DEFAULT_AMBIENT_COEFF
 
         # Estimate heating rate from heating periods
         if heating_rates:
@@ -175,7 +187,7 @@ class MPCTemperatureController:
 
             self.heating_rate = float(np.median(net_heating_rates))
         else:
-            self.heating_rate = 1.1  # Default fallback (1.1°C/hour, ~2°F/hour equivalent)
+            self.heating_rate = DEFAULT_HEATING_RATE
 
         # Learn cooling rate from cooling periods (if cooler_history provided)
         if cooler_history and cooling_rates:
@@ -191,6 +203,10 @@ class MPCTemperatureController:
                 self.cooling_rate = float(np.median(net_cooling_rates))
                 self.has_cooling = True
             else:
+                logging.warning(
+                    "Cooler data provided but all cooling periods failed sanity check. "
+                    "Cooling model disabled. Check that cooler provides significant cooling."
+                )
                 self.cooling_rate = None
                 self.has_cooling = False
         else:
@@ -303,16 +319,16 @@ class MPCTemperatureController:
                 error = temp - target_temp
                 if error > 0:
                     # Overshoot: heavily penalize
-                    cost += error ** 2 * 10
+                    cost += error ** 2 * OVERSHOOT_PENALTY_MULTIPLIER
                 else:
                     # Below target: normal penalty
                     cost += error ** 2
 
             # Small penalty for switching state (reduce cycling)
             if heater_currently_on is not None and action["heater_on"] != heater_currently_on:
-                cost += 0.1
+                cost += STATE_CHANGE_PENALTY
             if cooler_currently_on is not None and action["cooler_on"] != cooler_currently_on:
-                cost += 0.1
+                cost += STATE_CHANGE_PENALTY
 
             if cost < best_cost:
                 best_cost = cost

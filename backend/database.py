@@ -79,6 +79,84 @@ def _migrate_add_ml_columns(conn):
     logging.info("ML columns added successfully")
 
 
+async def _migrate_temps_fahrenheit_to_celsius(engine):
+    """Convert all temperature data from Fahrenheit to Celsius."""
+    from sqlalchemy import text
+    import logging
+
+    async with engine.begin() as conn:
+        # Check if readings table exists using SQLite-specific query
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='readings'"
+        ))
+        if not result.fetchone():
+            logging.info("Readings table doesn't exist yet, skipping temperature migration")
+            return
+
+        # Check if migration already applied by sampling a reading
+        result = await conn.execute(text(
+            "SELECT temp_raw FROM readings WHERE temp_raw IS NOT NULL LIMIT 1"
+        ))
+        row = result.fetchone()
+
+        if not row:
+            logging.info("No readings with temperature data, skipping migration")
+            return
+
+        if row[0] < 50:  # Already in Celsius (fermentation temps are 0-40°C)
+            logging.info("Temperatures already in Celsius, skipping migration")
+            return
+
+        logging.info("Converting temperatures from Fahrenheit to Celsius")
+
+        # Convert readings table
+        await conn.execute(text("""
+            UPDATE readings
+            SET
+                temp_raw = (temp_raw - 32) * 5.0 / 9.0,
+                temp_calibrated = (temp_calibrated - 32) * 5.0 / 9.0
+            WHERE temp_raw IS NOT NULL OR temp_calibrated IS NOT NULL
+        """))
+
+        # Convert calibration points (only if table exists)
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='calibration_points'"
+        ))
+        if result.fetchone():
+            await conn.execute(text("""
+                UPDATE calibration_points
+                SET
+                    raw_value = (raw_value - 32) * 5.0 / 9.0,
+                    actual_value = (actual_value - 32) * 5.0 / 9.0
+                WHERE type = 'temp'
+            """))
+
+        # Convert batch temperature fields (only if table exists)
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='batches'"
+        ))
+        if result.fetchone():
+            # Check if any batch has temperature values that need conversion (>50 = Fahrenheit)
+            result = await conn.execute(text("""
+                SELECT COUNT(*) FROM batches
+                WHERE (temp_target IS NOT NULL AND temp_target > 50)
+                   OR (temp_hysteresis IS NOT NULL AND temp_hysteresis > 50)
+            """))
+            count = result.scalar()
+
+            if count > 0:
+                logging.info(f"Converting {count} batch temperature fields from Fahrenheit to Celsius")
+                await conn.execute(text("""
+                    UPDATE batches
+                    SET
+                        temp_target = (temp_target - 32) * 5.0 / 9.0,
+                        temp_hysteresis = (temp_hysteresis - 32) * 5.0 / 9.0
+                    WHERE temp_target IS NOT NULL OR temp_hysteresis IS NOT NULL
+                """))
+
+        logging.info("Temperature conversion complete")
+
+
 async def init_db():
     """Initialize database with migrations.
 
@@ -115,6 +193,10 @@ async def init_db():
         await conn.run_sync(_migrate_add_deleted_at)  # Add soft delete support to batches
         await conn.run_sync(_migrate_add_deleted_at_index)  # Add index on deleted_at column
 
+    # Convert temperatures F→C (runs outside conn.begin() context since it has its own)
+    await _migrate_temps_fahrenheit_to_celsius(engine)
+
+    async with engine.begin() as conn:
         # Step 4: Data migrations
         await conn.run_sync(_migrate_tilts_to_devices)
         await conn.run_sync(_migrate_mark_outliers_invalid)  # Mark historical outliers
@@ -479,6 +561,13 @@ async def _migrate_add_cooler_entity():
     """Add cooler_entity_id column to batches table."""
     from sqlalchemy import text
     async with engine.begin() as conn:
+        # Check if batches table exists
+        result = await conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='batches'"
+        ))
+        if not result.fetchone():
+            return  # Fresh install, create_all will handle it
+
         # Check if column exists
         result = await conn.execute(text("PRAGMA table_info(batches)"))
         columns = {row[1] for row in result}

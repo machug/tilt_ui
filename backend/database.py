@@ -137,21 +137,26 @@ async def _migrate_temps_fahrenheit_to_celsius(engine):
         ))
         if result.fetchone():
             # Check if any batch has temperature values that need conversion (>50 = Fahrenheit)
+            # Note: Only check temp_target since hysteresis values are small deltas (<10)
             result = await conn.execute(text("""
                 SELECT COUNT(*) FROM batches
-                WHERE (temp_target IS NOT NULL AND temp_target > 50)
-                   OR (temp_hysteresis IS NOT NULL AND temp_hysteresis > 50)
+                WHERE temp_target IS NOT NULL AND temp_target > 50
             """))
             count = result.scalar()
 
             if count > 0:
                 logging.info(f"Converting {count} batch temperature fields from Fahrenheit to Celsius")
+                # Convert temp_target (absolute temperature): (F - 32) * 5/9
+                # Convert temp_hysteresis (temperature delta): F * 5/9 (no -32 offset)
                 await conn.execute(text("""
                     UPDATE batches
                     SET
                         temp_target = (temp_target - 32) * 5.0 / 9.0,
-                        temp_hysteresis = (temp_hysteresis - 32) * 5.0 / 9.0
-                    WHERE temp_target IS NOT NULL OR temp_hysteresis IS NOT NULL
+                        temp_hysteresis = CASE
+                            WHEN temp_hysteresis IS NOT NULL THEN temp_hysteresis * 5.0 / 9.0
+                            ELSE temp_hysteresis
+                        END
+                    WHERE temp_target > 50
                 """))
 
         # NOTE: ambient_readings table is NOT converted - Home Assistant already sends Celsius

@@ -185,9 +185,9 @@ class MLPipeline:
                 len(self.ambient_history),
             )
             if min_history_len >= 3:
-                # Pass cooler_history only if we have cooler data
+                # Pass cooler_history only if we have sufficient cooler data
                 cooler_hist = None
-                if self.cooler_history:
+                if self.cooler_history and len(self.cooler_history) >= min_history_len:
                     cooler_hist = self.cooler_history[-min_history_len:]
 
                 self.mpc_controller.learn_thermal_model(

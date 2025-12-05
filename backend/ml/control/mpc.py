@@ -25,7 +25,7 @@ import numpy as np
 from typing import Optional
 
 # Default thermal model parameters for typical fermentation chamber
-DEFAULT_AMBIENT_COEFF = 0.1  # °C/hour per degree difference from ambient
+DEFAULT_AMBIENT_COEFF = 0.1  # °C/hour per degree difference from ambient (e.g., 2°C above ambient → 0.2°C/h natural cooling)
 DEFAULT_HEATING_RATE = 1.1   # °C/hour when heater ON (~2°F/hour equivalent)
 
 # Learning algorithm parameters
@@ -169,6 +169,7 @@ class MPCTemperatureController:
             coeffs = []
             for rate, temp_diff in coeff_sources:
                 # Avoid division by near-zero
+                # Note: temp_diff is typically positive (fermentation temp > ambient) during idle periods
                 if abs(temp_diff) > MIN_TEMP_GRADIENT:
                     coeff = -rate / temp_diff
                     # Sanity check: coefficient should be positive and reasonable
@@ -318,19 +319,19 @@ class MPCTemperatureController:
             )
 
             # Calculate cost: penalize distance from target
-            # Asymmetric penalty prevents overshoot in heating mode
-            # For fermentation, overshooting temperature (too hot) damages yeast more than undershooting
+            # Asymmetric penalty: heavily penalize temperatures ABOVE target
+            # For fermentation, high temperatures (whether from heating or insufficient cooling)
+            # damage yeast irreversibly, while low temperatures merely slow fermentation
             cost = 0
             for temp in trajectory:
                 error = temp - target_temp
 
                 if error > 0:
-                    # Above target: heavily penalize (overshoot risk)
-                    # This applies equally in heating and cooling modes
+                    # Above target: heavily penalize (high temp damages yeast)
+                    # Applies to both heating overshoot and cooling undershoot
                     cost += error ** 2 * OVERSHOOT_PENALTY_MULTIPLIER
                 else:
-                    # Below target: normal penalty
-                    # Undershoot is less critical for fermentation
+                    # Below target: normal penalty (low temp slows but doesn't damage)
                     cost += error ** 2
 
             # Small penalty for switching state (reduce cycling)

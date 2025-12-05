@@ -87,14 +87,17 @@ async def handle_tilt_reading(reading: TiltReading):
         tilt.last_seen = datetime.now(timezone.utc)
         tilt.mac = reading.mac
 
-        # Apply calibration
-        sg_calibrated, temp_calibrated = await calibration_service.calibrate_reading(
-            session, reading.id, reading.sg, reading.temp_f
+        # Convert Tilt's Fahrenheit to Celsius immediately
+        temp_raw_c = (reading.temp_f - 32) * 5.0 / 9.0
+
+        # Apply calibration in Celsius
+        sg_calibrated, temp_calibrated_c = await calibration_service.calibrate_reading(
+            session, reading.id, reading.sg, temp_raw_c
         )
 
         # Validate reading for outliers (physical impossibility check)
         # Valid SG range: 0.500-1.200 (beer is typically 1.000-1.120)
-        # Valid temp range: 32-212°F (freezing to boiling)
+        # Valid temp range: 0-100°C (freezing to boiling)
         # IMPORTANT: Validate BEFORE smoothing to prevent invalid readings from polluting the moving average buffer
         status = "valid"
         if not (0.500 <= sg_calibrated <= 1.200):
@@ -102,10 +105,10 @@ async def handle_tilt_reading(reading: TiltReading):
             logging.warning(
                 f"Outlier SG detected: {sg_calibrated:.4f} (valid: 0.500-1.200) for device {reading.id}"
             )
-        elif not (32.0 <= temp_calibrated <= 212.0):
+        elif not (0.0 <= temp_calibrated_c <= 100.0):
             status = "invalid"
             logging.warning(
-                f"Outlier temperature detected: {temp_calibrated:.1f}°F (valid: 32-212) for device {reading.id}"
+                f"Outlier temperature detected: {temp_calibrated_c:.1f}°C (valid: 0-100) for device {reading.id}"
             )
 
         # Apply smoothing if enabled (only for valid readings)
@@ -123,8 +126,8 @@ async def handle_tilt_reading(reading: TiltReading):
                 smoothing_enabled, smoothing_samples = _smoothing_config_cache
 
             if smoothing_enabled and smoothing_samples and smoothing_samples > 1:
-                sg_calibrated, temp_calibrated = await smoothing_service.smooth_reading(
-                    session, reading.id, sg_calibrated, temp_calibrated, smoothing_samples
+                sg_calibrated, temp_calibrated_c = await smoothing_service.smooth_reading(
+                    session, reading.id, sg_calibrated, temp_calibrated_c, smoothing_samples
                 )
 
         # Only store reading if device is paired
@@ -142,8 +145,8 @@ async def handle_tilt_reading(reading: TiltReading):
                 batch_id=batch_id,
                 sg_raw=reading.sg,
                 sg_calibrated=sg_calibrated,
-                temp_raw=reading.temp_f,
-                temp_calibrated=temp_calibrated,
+                temp_raw=temp_raw_c,
+                temp_calibrated=temp_calibrated_c,
                 rssi=reading.rssi,
                 status=status,  # Mark as valid or invalid
             )
@@ -152,7 +155,7 @@ async def handle_tilt_reading(reading: TiltReading):
         await session.commit()
 
         # Build reading data for WebSocket broadcast (always broadcast)
-        # Temperatures are in Fahrenheit (from Tilt devices)
+        # Temperatures are in Celsius (converted from Tilt's Fahrenheit)
         # Frontend will convert based on user preference
         reading_data = {
             "id": reading.id,
@@ -161,8 +164,8 @@ async def handle_tilt_reading(reading: TiltReading):
             "original_gravity": tilt.original_gravity,
             "sg": sg_calibrated,
             "sg_raw": reading.sg,
-            "temp": temp_calibrated,
-            "temp_raw": reading.temp_f,
+            "temp": temp_calibrated_c,
+            "temp_raw": temp_raw_c,
             "rssi": reading.rssi,
             "last_seen": serialize_datetime_to_utc(datetime.now(timezone.utc)),
             "paired": tilt.paired,  # Include pairing status

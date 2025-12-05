@@ -110,6 +110,23 @@ class MPCTemperatureController:
                 "has_cooling": False,
             }
 
+        # Validate numeric data types
+        try:
+            # Verify all values can be converted to float
+            _ = [float(x) for x in temp_history[:min_len]]
+            _ = [float(x) for x in time_history[:min_len]]
+            _ = [float(x) for x in ambient_history[:min_len]]
+            # Boolean history validation happens during categorization
+        except (ValueError, TypeError):
+            return {
+                "success": False,
+                "reason": "invalid_data_type",
+                "heating_rate": None,
+                "cooling_rate": None,
+                "ambient_coeff": None,
+                "has_cooling": False,
+            }
+
         # Slice all histories to same length to prevent IndexError
         temp_history = temp_history[-min_len:]
         time_history = time_history[-min_len:]
@@ -197,6 +214,7 @@ class MPCTemperatureController:
         if cooler_history and cooling_rates:
             # rate = -cooling_rate - ambient_coeff * temp_above_ambient
             # cooling_rate = -rate - ambient_coeff * temp_above_ambient
+            assert self.ambient_coeff is not None, "ambient_coeff must be learned before cooling_rate"
             net_cooling_rates = []
             for rate, temp_diff in cooling_rates:
                 net_rate = -rate - self.ambient_coeff * temp_diff
@@ -319,19 +337,25 @@ class MPCTemperatureController:
             )
 
             # Calculate cost: penalize distance from target
-            # Asymmetric penalty: heavily penalize temperatures ABOVE target
-            # For fermentation, high temperatures (whether from heating or insufficient cooling)
-            # damage yeast irreversibly, while low temperatures merely slow fermentation
+            # Asymmetric penalty: heavily penalize HIGH temperatures
+            #
+            # Fermentation biology: High temps damage yeast irreversibly by denaturing proteins
+            # and producing off-flavors, while low temps merely slow fermentation kinetics.
+            # This asymmetry applies regardless of control mode:
+            # - Heating mode: Penalize overshooting above target (heater runs too long)
+            # - Cooling mode: Penalize undershooting cooling effort (insufficient cooling → high temps)
+            #
+            # Result: Controller is conservative when approaching target from below (heating),
+            # and aggressive when temperature is above target (cooling or heater shutoff).
             cost = 0
             for temp in trajectory:
                 error = temp - target_temp
 
                 if error > 0:
-                    # Above target: heavily penalize (high temp damages yeast)
-                    # Applies to both heating overshoot and cooling undershoot
+                    # Temperature above target: heavily penalize
                     cost += error ** 2 * OVERSHOOT_PENALTY_MULTIPLIER
                 else:
-                    # Below target: normal penalty (low temp slows but doesn't damage)
+                    # Temperature below target: normal penalty
                     cost += error ** 2
 
             # Small penalty for switching state (reduce cycling)

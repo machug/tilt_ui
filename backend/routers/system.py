@@ -154,9 +154,9 @@ async def list_timezones():
 async def get_timezone():
     """Get current timezone."""
     try:
-        # Use timedatectl (most reliable on modern systems)
+        # Use timedatectl (most reliable on modern systems) - use full path
         result = subprocess.run(
-            ["timedatectl", "show", "--property=Timezone", "--value"],
+            ["/usr/bin/timedatectl", "show", "--property=Timezone", "--value"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -192,7 +192,7 @@ async def set_timezone(update: TimezoneUpdate, request: Request):
         raise HTTPException(status_code=400, detail=f"Unknown timezone: {update.timezone}")
     try:
         subprocess.run(
-            ["sudo", "timedatectl", "set-timezone", update.timezone],
+            ["/usr/bin/sudo", "/usr/bin/timedatectl", "set-timezone", update.timezone],
             check=True,
             timeout=10,
         )

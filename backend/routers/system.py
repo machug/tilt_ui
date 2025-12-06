@@ -161,16 +161,16 @@ async def get_timezone():
             text=True,
             timeout=5,
         )
-        logger.info(f"timedatectl returncode: {result.returncode}, stdout: '{result.stdout.strip()}', stderr: '{result.stderr.strip()}'")
+        logger.debug(f"timedatectl returncode: {result.returncode}, stdout: '{result.stdout.strip()}', stderr: '{result.stderr.strip()}'")
         if result.returncode == 0 and result.stdout.strip():
             tz = result.stdout.strip()
-            logger.info(f"Returning timezone from timedatectl: {tz}")
+            logger.debug(f"Returning timezone from timedatectl: {tz}")
             return {"timezone": tz}
         # Fallback to /etc/timezone
         tz_file = Path("/etc/timezone")
         if tz_file.exists():
             tz = tz_file.read_text().strip()
-            logger.info(f"Returning timezone from /etc/timezone: {tz}")
+            logger.debug(f"Returning timezone from /etc/timezone: {tz}")
             return {"timezone": tz}
     except Exception as e:
         logger.error(f"Error getting timezone: {e}")

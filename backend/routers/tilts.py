@@ -1,11 +1,14 @@
 """Tilt hydrometer API endpoints."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from ..database import get_db
 from ..models import (
@@ -213,6 +216,11 @@ async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     if device:
         device.paired = True
         device.paired_at = paired_at
+    else:
+        logger.warning(
+            f"Device record not found for Tilt {tilt_id} during pairing. "
+            "Only legacy Tilt table was updated. Consider running migration to sync tables."
+        )
 
     await db.commit()
     await db.refresh(tilt)
@@ -241,6 +249,11 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     if device:
         device.paired = False
         device.paired_at = None
+    else:
+        logger.warning(
+            f"Device record not found for Tilt {tilt_id} during unpairing. "
+            "Only legacy Tilt table was updated. Consider running migration to sync tables."
+        )
 
     await db.commit()
     await db.refresh(tilt)

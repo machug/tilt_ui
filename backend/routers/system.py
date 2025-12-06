@@ -20,6 +20,10 @@ from ..cleanup import cleanup_old_readings, get_reading_stats
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system", tags=["system"])
 
+# System command paths - hardcoded for security (prevents PATH manipulation attacks)
+TIMEDATECTL_PATH = "/usr/bin/timedatectl"
+SUDO_PATH = "/usr/bin/sudo"
+
 # Read version from VERSION file
 _version_file = Path(__file__).parent.parent.parent / "VERSION"
 VERSION = _version_file.read_text().strip() if _version_file.exists() else "0.0.0"
@@ -153,27 +157,32 @@ async def list_timezones():
 @router.get("/timezone")
 async def get_timezone():
     """Get current timezone."""
+    # Validate timedatectl exists
+    if not Path(TIMEDATECTL_PATH).exists():
+        logger.error(f"timedatectl not found at {TIMEDATECTL_PATH}")
+        return {"timezone": "UTC"}
+
     try:
-        # Use timedatectl (most reliable on modern systems) - use full path
         result = subprocess.run(
-            ["/usr/bin/timedatectl", "show", "--property=Timezone", "--value"],
+            [TIMEDATECTL_PATH, "show", "--property=Timezone", "--value"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        logger.info(f"timedatectl returncode: {result.returncode}, stdout: '{result.stdout.strip()}', stderr: '{result.stderr.strip()}'")
         if result.returncode == 0 and result.stdout.strip():
             tz = result.stdout.strip()
-            logger.info(f"Returning timezone from timedatectl: {tz}")
+            logger.debug(f"Returning timezone from timedatectl: {tz}")
             return {"timezone": tz}
+
         # Fallback to /etc/timezone
         tz_file = Path("/etc/timezone")
         if tz_file.exists():
             tz = tz_file.read_text().strip()
-            logger.info(f"Returning timezone from /etc/timezone: {tz}")
+            logger.debug(f"Returning timezone from /etc/timezone: {tz}")
             return {"timezone": tz}
     except Exception as e:
         logger.error(f"Error getting timezone: {e}")
+
     logger.warning("Falling back to UTC timezone")
     return {"timezone": "UTC"}
 
@@ -186,13 +195,21 @@ async def set_timezone(update: TimezoneUpdate, request: Request):
             status_code=403,
             detail="System controls only available from local network",
         )
+
     # Validate timezone exists
     tz_path = Path(f"/usr/share/zoneinfo/{update.timezone}")
     if not tz_path.exists():
         raise HTTPException(status_code=400, detail=f"Unknown timezone: {update.timezone}")
+
+    # Validate required binaries exist
+    if not Path(SUDO_PATH).exists():
+        raise HTTPException(status_code=500, detail="sudo not found")
+    if not Path(TIMEDATECTL_PATH).exists():
+        raise HTTPException(status_code=500, detail="timedatectl not found")
+
     try:
         subprocess.run(
-            ["/usr/bin/sudo", "/usr/bin/timedatectl", "set-timezone", update.timezone],
+            [SUDO_PATH, TIMEDATECTL_PATH, "set-timezone", update.timezone],
             check=True,
             timeout=10,
         )

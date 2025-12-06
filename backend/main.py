@@ -16,7 +16,7 @@ from sqlalchemy import select, desc  # noqa: E402
 
 from . import models  # noqa: E402, F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db  # noqa: E402
-from .models import Reading, Tilt, serialize_datetime_to_utc  # noqa: E402
+from .models import Device, Reading, Tilt, serialize_datetime_to_utc  # noqa: E402
 from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, maintenance, recipes, system, tilts  # noqa: E402
 from .routers.config import get_config_value  # noqa: E402
 from .ambient_poller import start_ambient_poller, stop_ambient_poller  # noqa: E402
@@ -83,8 +83,27 @@ async def handle_tilt_reading(reading: TiltReading):
             )
             session.add(tilt)
 
-        tilt.last_seen = datetime.now(timezone.utc)
+        timestamp = datetime.now(timezone.utc)
+        tilt.last_seen = timestamp
         tilt.mac = reading.mac
+
+        # Also update/create universal Device record for consistency
+        device = await session.get(Device, reading.id)
+        if not device:
+            device = Device(
+                id=reading.id,
+                device_type="tilt",
+                name=reading.color,
+                display_name=None,
+                native_gravity_unit="sg",
+                native_temp_unit="F",
+                calibration_type="linear",
+                paired=tilt.paired,
+            )
+            session.add(device)
+        device.last_seen = timestamp
+        device.color = reading.color
+        device.mac = reading.mac
 
         # Convert Tilt's Fahrenheit to Celsius immediately
         temp_raw_c = (reading.temp_f - 32) * 5.0 / 9.0

@@ -34,24 +34,6 @@ def serialize_datetime_to_utc(dt: Optional[datetime]) -> Optional[str]:
 
 
 # SQLAlchemy Models
-class Tilt(Base):
-    __tablename__ = "tilts"
-
-    id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    color: Mapped[str] = mapped_column(String(20), nullable=False)
-    mac: Mapped[Optional[str]] = mapped_column(String(17))
-    beer_name: Mapped[str] = mapped_column(String(100), default="Untitled")
-    original_gravity: Mapped[Optional[float]] = mapped_column()
-    last_seen: Mapped[Optional[datetime]] = mapped_column()
-    paired: Mapped[bool] = mapped_column(default=False, server_default=false(), index=True)
-    paired_at: Mapped[Optional[datetime]] = mapped_column()
-
-    readings: Mapped[list["Reading"]] = relationship(back_populates="tilt", cascade="all, delete-orphan")
-    calibration_points: Mapped[list["CalibrationPoint"]] = relationship(
-        back_populates="tilt", cascade="all, delete-orphan"
-    )
-
-
 class Device(Base):
     """Universal hydrometer device registry."""
     __tablename__ = "devices"
@@ -106,20 +88,19 @@ class Device(Base):
 
     # Relationships
     readings: Mapped[list["Reading"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    calibration_points: Mapped[list["CalibrationPoint"]] = relationship(back_populates="device", cascade="all, delete-orphan")
 
 class Reading(Base):
+    """Hydrometer reading (from any device type)."""
     __tablename__ = "readings"
     __table_args__ = (
-        Index("ix_readings_tilt_timestamp", "tilt_id", "timestamp"),
         Index("ix_readings_device_timestamp", "device_id", "timestamp"),
         Index("ix_readings_batch_timestamp", "batch_id", "timestamp"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    # Legacy Tilt FK - nullable for non-Tilt devices
-    tilt_id: Mapped[Optional[str]] = mapped_column(ForeignKey("tilts.id"), nullable=True, index=True)
     # Universal device FK - for all device types including Tilt
-    device_id: Mapped[Optional[str]] = mapped_column(ForeignKey("devices.id"), nullable=True, index=True)
+    device_id: Mapped[Optional[str]] = mapped_column(String(100), ForeignKey("devices.id"), nullable=True, index=True)
     # Batch FK - for tracking readings per batch
     batch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("batches.id"), nullable=True, index=True)
     device_type: Mapped[str] = mapped_column(String(20), default="tilt")
@@ -161,24 +142,24 @@ class Reading(Base):
     anomaly_reasons: Mapped[Optional[str]] = mapped_column(Text)  # JSON array
 
     # Relationships
-    tilt: Mapped[Optional["Tilt"]] = relationship(back_populates="readings")
     device: Mapped[Optional["Device"]] = relationship(back_populates="readings")
     batch: Mapped[Optional["Batch"]] = relationship(back_populates="readings")
 
 
 class CalibrationPoint(Base):
+    """Calibration point for device (was: tilt)."""
     __tablename__ = "calibration_points"
     __table_args__ = (
-        UniqueConstraint("tilt_id", "type", "raw_value", name="uq_calibration_point"),
+        UniqueConstraint("device_id", "type", "raw_value", name="uq_calibration_point"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tilt_id: Mapped[str] = mapped_column(ForeignKey("tilts.id"), nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(100), ForeignKey("devices.id"), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(10), nullable=False)  # 'sg' or 'temp'
     raw_value: Mapped[float] = mapped_column(nullable=False)
     actual_value: Mapped[float] = mapped_column(nullable=False)
 
-    tilt: Mapped["Tilt"] = relationship(back_populates="calibration_points")
+    device: Mapped["Device"] = relationship(back_populates="calibration_points")
 
 
 class AmbientReading(Base):
@@ -503,48 +484,6 @@ class RecipeMisc(Base):
 
 
 # Pydantic Schemas
-class TiltBase(BaseModel):
-    color: str
-    beer_name: str = "Untitled"
-
-
-class TiltCreate(TiltBase):
-    id: str
-    mac: Optional[str] = None
-
-
-class TiltUpdate(BaseModel):
-    beer_name: Optional[str] = None
-    original_gravity: Optional[float] = None
-    paired: Optional[bool] = None
-
-    @field_validator("original_gravity")
-    @classmethod
-    def validate_og(cls, v: Optional[float]) -> Optional[float]:
-        if v is not None and (v < 0.990 or v > 1.200):
-            raise ValueError("original_gravity must be between 0.990 and 1.200")
-        return v
-
-    def is_field_set(self, field_name: str) -> bool:
-        """Check if a field was explicitly provided in the request."""
-        return field_name in self.model_fields_set
-
-
-class TiltResponse(TiltBase):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    mac: Optional[str]
-    original_gravity: Optional[float]
-    last_seen: Optional[datetime]
-    paired: bool = False
-    paired_at: Optional[datetime] = None
-
-    @field_serializer('last_seen', 'paired_at')
-    def serialize_dt(self, dt: Optional[datetime]) -> Optional[str]:
-        return serialize_datetime_to_utc(dt)
-
-
 class TiltReading(BaseModel):
     id: str
     color: str

@@ -90,6 +90,7 @@ async def handle_tilt_reading(reading: TiltReading):
         # Also update/create universal Device record for consistency
         device = await session.get(Device, reading.id)
         if not device:
+            # Create new Device record - paired status should only be set via pairing endpoints
             device = Device(
                 id=reading.id,
                 device_type="tilt",
@@ -98,9 +99,11 @@ async def handle_tilt_reading(reading: TiltReading):
                 native_gravity_unit="sg",
                 native_temp_unit="F",
                 calibration_type="linear",
-                paired=tilt.paired,
+                paired=False,  # New devices start unpaired
             )
             session.add(device)
+        # Only update non-pairing fields from readings (last_seen, color, mac)
+        # Paired status is controlled exclusively via pairing endpoints
         device.last_seen = timestamp
         device.color = reading.color
         device.mac = reading.mac

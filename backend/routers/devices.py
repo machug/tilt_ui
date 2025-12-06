@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Device
+from ..models import Device, serialize_datetime_to_utc
 from ..services.calibration import calibration_service
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -121,6 +121,10 @@ class DeviceResponse(BaseModel):
     created_at: datetime
     paired: bool
     paired_at: Optional[datetime]
+
+    @field_serializer('last_seen', 'created_at', 'paired_at')
+    def serialize_dt(self, dt: Optional[datetime]) -> Optional[str]:
+        return serialize_datetime_to_utc(dt)
 
     @classmethod
     def from_orm_with_calibration(cls, device: Device) -> "DeviceResponse":

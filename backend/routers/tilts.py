@@ -217,10 +217,23 @@ async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
         device.paired = True
         device.paired_at = paired_at
     else:
-        logger.warning(
-            f"Device record not found for Tilt {tilt_id} during pairing. "
-            "Only legacy Tilt table was updated. Consider running migration to sync tables."
+        # Create missing Device record to maintain data consistency
+        logger.info(f"Creating Device record for Tilt {tilt_id} during pairing")
+        device = Device(
+            id=tilt_id,
+            device_type="tilt",
+            name=tilt.color,
+            display_name=None,
+            native_gravity_unit="sg",
+            native_temp_unit="F",
+            calibration_type="linear",
+            paired=True,
+            paired_at=paired_at,
         )
+        device.color = tilt.color
+        device.mac = tilt.mac
+        device.last_seen = tilt.last_seen
+        db.add(device)
 
     await db.commit()
     await db.refresh(tilt)
@@ -250,10 +263,23 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
         device.paired = False
         device.paired_at = None
     else:
-        logger.warning(
-            f"Device record not found for Tilt {tilt_id} during unpairing. "
-            "Only legacy Tilt table was updated. Consider running migration to sync tables."
+        # Create missing Device record to maintain data consistency
+        logger.info(f"Creating Device record for Tilt {tilt_id} during unpairing")
+        device = Device(
+            id=tilt_id,
+            device_type="tilt",
+            name=tilt.color,
+            display_name=None,
+            native_gravity_unit="sg",
+            native_temp_unit="F",
+            calibration_type="linear",
+            paired=False,
+            paired_at=None,
         )
+        device.color = tilt.color
+        device.mac = tilt.mac
+        device.last_seen = tilt.last_seen
+        db.add(device)
 
     await db.commit()
     await db.refresh(tilt)

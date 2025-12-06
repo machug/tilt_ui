@@ -6,6 +6,7 @@ Safety: Destructive operations (reboot/shutdown) require:
 """
 
 import logging
+import shutil
 import socket
 import subprocess
 from datetime import datetime, timezone
@@ -154,9 +155,10 @@ async def list_timezones():
 async def get_timezone():
     """Get current timezone."""
     try:
-        # Use timedatectl (most reliable on modern systems) - use full path
+        # Use timedatectl (most reliable on modern systems)
+        timedatectl_path = shutil.which("timedatectl") or "/usr/bin/timedatectl"
         result = subprocess.run(
-            ["/usr/bin/timedatectl", "show", "--property=Timezone", "--value"],
+            [timedatectl_path, "show", "--property=Timezone", "--value"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -191,8 +193,10 @@ async def set_timezone(update: TimezoneUpdate, request: Request):
     if not tz_path.exists():
         raise HTTPException(status_code=400, detail=f"Unknown timezone: {update.timezone}")
     try:
+        sudo_path = shutil.which("sudo") or "/usr/bin/sudo"
+        timedatectl_path = shutil.which("timedatectl") or "/usr/bin/timedatectl"
         subprocess.run(
-            ["/usr/bin/sudo", "/usr/bin/timedatectl", "set-timezone", update.timezone],
+            [sudo_path, timedatectl_path, "set-timezone", update.timezone],
             check=True,
             timeout=10,
         )

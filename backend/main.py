@@ -28,6 +28,7 @@ from .services.batch_linker import link_reading_to_batch  # noqa: E402
 from .state import latest_readings  # noqa: E402
 from .websocket import manager  # noqa: E402
 from .ml.pipeline_manager import MLPipelineManager  # noqa: E402
+from .device_utils import create_tilt_device_record  # noqa: E402
 import time  # noqa: E402
 import json  # noqa: E402
 
@@ -91,14 +92,11 @@ async def handle_tilt_reading(reading: TiltReading):
         device = await session.get(Device, reading.id)
         if not device:
             # Create new Device record - paired status should only be set via pairing endpoints
-            device = Device(
-                id=reading.id,
-                device_type="tilt",
-                name=reading.color,
-                display_name=None,
-                native_gravity_unit="sg",
-                native_temp_unit="F",
-                calibration_type="linear",
+            device = create_tilt_device_record(
+                device_id=reading.id,
+                color=reading.color,
+                mac=reading.mac,
+                last_seen=timestamp,
                 paired=False,  # New devices start unpaired
             )
             session.add(device)

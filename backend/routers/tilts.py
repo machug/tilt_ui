@@ -25,6 +25,7 @@ from ..models import (
 from ..services.calibration import calibration_service
 from ..state import latest_readings
 from ..websocket import manager
+from ..device_utils import create_tilt_device_record
 
 router = APIRouter(prefix="/api/tilts", tags=["tilts"])
 
@@ -219,20 +220,14 @@ async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     else:
         # Create missing Device record to maintain data consistency
         logger.info(f"Creating Device record for Tilt {tilt_id} during pairing")
-        device = Device(
-            id=tilt_id,
-            device_type="tilt",
-            name=tilt.color,
-            display_name=None,
-            native_gravity_unit="sg",
-            native_temp_unit="F",
-            calibration_type="linear",
+        device = create_tilt_device_record(
+            device_id=tilt_id,
+            color=tilt.color,
+            mac=tilt.mac,
+            last_seen=tilt.last_seen,
             paired=True,
             paired_at=paired_at,
         )
-        device.color = tilt.color
-        device.mac = tilt.mac
-        device.last_seen = tilt.last_seen
         db.add(device)
 
     await db.commit()
@@ -265,20 +260,14 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     else:
         # Create missing Device record to maintain data consistency
         logger.info(f"Creating Device record for Tilt {tilt_id} during unpairing")
-        device = Device(
-            id=tilt_id,
-            device_type="tilt",
-            name=tilt.color,
-            display_name=None,
-            native_gravity_unit="sg",
-            native_temp_unit="F",
-            calibration_type="linear",
+        device = create_tilt_device_record(
+            device_id=tilt_id,
+            color=tilt.color,
+            mac=tilt.mac,
+            last_seen=tilt.last_seen,
             paired=False,
             paired_at=None,
         )
-        device.color = tilt.color
-        device.mac = tilt.mac
-        device.last_seen = tilt.last_seen
         db.add(device)
 
     await db.commit()

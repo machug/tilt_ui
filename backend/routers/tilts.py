@@ -252,16 +252,24 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     tilt.paired = False
     tilt.paired_at = None
 
-    # Also update Device table for universal device support if it exists
-    # Don't create Device record during unpair - it should only be created during reading ingestion
+    # Also update Device table for universal device support
+    # Create Device record if missing to maintain data consistency between tables
     device = await db.get(Device, tilt_id)
     if device:
         device.paired = False
         device.paired_at = None
     else:
-        # Device record doesn't exist - this is unusual but not an error
-        # The reading handler will create it on next reading
-        logger.warning(f"Device record not found for Tilt {tilt_id} during unpairing - will be created on next reading")
+        # Create missing Device record to maintain data consistency
+        logger.info(f"Creating Device record for Tilt {tilt_id} during unpairing")
+        device = create_tilt_device_record(
+            device_id=tilt_id,
+            color=tilt.color,
+            mac=tilt.mac,
+            last_seen=tilt.last_seen,
+            paired=False,
+            paired_at=None,
+        )
+        db.add(device)
 
     await db.commit()
     await db.refresh(tilt)

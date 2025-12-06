@@ -13,6 +13,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from sqlalchemy import select, desc  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
 
 from . import models  # noqa: E402, F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db  # noqa: E402
@@ -100,6 +101,16 @@ async def handle_tilt_reading(reading: TiltReading):
                 paired=False,  # New devices start unpaired
             )
             session.add(device)
+            try:
+                await session.flush()  # Flush to catch IntegrityError from concurrent creation
+            except IntegrityError:
+                # Another task created this device concurrently - rollback and refetch
+                await session.rollback()
+                device = await session.get(Device, reading.id)
+                if not device:
+                    # Should never happen, but handle gracefully
+                    logging.error(f"Failed to create or fetch Device {reading.id} after IntegrityError")
+                    return
         # Only update non-pairing fields from readings (last_seen, color, mac)
         # Paired status is controlled exclusively via pairing endpoints
         device.last_seen = timestamp

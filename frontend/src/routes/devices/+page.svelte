@@ -160,7 +160,7 @@
 										<span class="detail-value mono">{device.mac}</span>
 									</div>
 								{/if}
-								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && device.battery_voltage}
+								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && device.battery_voltage !== null && device.battery_voltage !== undefined}
 									<div class="detail-row">
 										<span class="detail-label">Battery:</span>
 										<span class="detail-value">{device.battery_voltage.toFixed(2)}V</span>
@@ -230,7 +230,7 @@
 										<span class="detail-value mono">{device.mac}</span>
 									</div>
 								{/if}
-								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && device.battery_voltage}
+								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && device.battery_voltage !== null && device.battery_voltage !== undefined}
 									<div class="detail-row">
 										<span class="detail-label">Battery:</span>
 										<span class="detail-value">{device.battery_voltage.toFixed(2)}V</span>

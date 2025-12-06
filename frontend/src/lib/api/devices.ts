@@ -28,15 +28,15 @@ export async function fetchAllDevices(pairedOnly: boolean = false): Promise<Devi
 }
 
 export async function pairDevice(deviceId: string): Promise<DeviceResponse> {
-	// Use legacy /api/tilts endpoint for pairing (still works for all devices)
-	return fetchApi(`/api/tilts/${deviceId}/pair`, {
+	// Use universal /api/devices endpoint for pairing (works for all device types)
+	return fetchApi(`/api/devices/${deviceId}/pair`, {
 		method: 'POST'
 	});
 }
 
 export async function unpairDevice(deviceId: string): Promise<DeviceResponse> {
-	// Use legacy /api/tilts endpoint for unpairing (still works for all devices)
-	return fetchApi(`/api/tilts/${deviceId}/unpair`, {
+	// Use universal /api/devices endpoint for unpairing (works for all device types)
+	return fetchApi(`/api/devices/${deviceId}/unpair`, {
 		method: 'POST'
 	});
 }

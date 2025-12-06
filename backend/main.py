@@ -13,10 +13,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from sqlalchemy import select, desc  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
 
 from . import models  # noqa: E402, F401 - Import models so SQLAlchemy sees them
 from .database import async_session_factory, init_db  # noqa: E402
-from .models import Reading, Tilt, serialize_datetime_to_utc  # noqa: E402
+from .models import Device, Reading, Tilt, serialize_datetime_to_utc  # noqa: E402
 from .routers import alerts, ambient, batches, config, control, devices, ha, ingest, maintenance, recipes, system, tilts  # noqa: E402
 from .routers.config import get_config_value  # noqa: E402
 from .ambient_poller import start_ambient_poller, stop_ambient_poller  # noqa: E402
@@ -28,6 +29,7 @@ from .services.batch_linker import link_reading_to_batch  # noqa: E402
 from .state import latest_readings  # noqa: E402
 from .websocket import manager  # noqa: E402
 from .ml.pipeline_manager import MLPipelineManager  # noqa: E402
+from .device_utils import create_tilt_device_record  # noqa: E402
 import time  # noqa: E402
 import json  # noqa: E402
 
@@ -82,9 +84,48 @@ async def handle_tilt_reading(reading: TiltReading):
                 paired=False,  # New devices start unpaired
             )
             session.add(tilt)
+            try:
+                await session.flush()  # Flush to catch IntegrityError from concurrent Tilt creation
+            except IntegrityError:
+                # Another task created this Tilt concurrently - rollback and refetch
+                await session.rollback()
+                tilt = await session.get(Tilt, reading.id)
+                if not tilt:
+                    # Should never happen, but handle gracefully
+                    logging.error(f"Failed to create or fetch Tilt {reading.id} after IntegrityError")
+                    return
 
-        tilt.last_seen = datetime.now(timezone.utc)
+        timestamp = datetime.now(timezone.utc)
+        tilt.last_seen = timestamp
         tilt.mac = reading.mac
+
+        # Also update/create universal Device record for consistency
+        device = await session.get(Device, reading.id)
+        if not device:
+            # Create new Device record - paired status should only be set via pairing endpoints
+            device = create_tilt_device_record(
+                device_id=reading.id,
+                color=reading.color,
+                mac=reading.mac,
+                last_seen=timestamp,
+                paired=False,  # New devices start unpaired
+            )
+            session.add(device)
+            try:
+                await session.flush()  # Flush to catch IntegrityError from concurrent creation
+            except IntegrityError:
+                # Another task created this device concurrently - rollback and refetch
+                await session.rollback()
+                device = await session.get(Device, reading.id)
+                if not device:
+                    # Should never happen, but handle gracefully
+                    logging.error(f"Failed to create or fetch Device {reading.id} after IntegrityError")
+                    return
+        # Only update non-pairing fields from readings (last_seen, color, mac)
+        # Paired status is controlled exclusively via pairing endpoints
+        device.last_seen = timestamp
+        device.color = reading.color
+        device.mac = reading.mac
 
         # Convert Tilt's Fahrenheit to Celsius immediately
         temp_raw_c = (reading.temp_f - 32) * 5.0 / 9.0

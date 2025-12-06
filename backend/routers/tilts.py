@@ -1,5 +1,6 @@
 """Tilt hydrometer API endpoints."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -7,11 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 from ..database import get_db
 from ..models import (
     CalibrationPoint,
     CalibrationPointCreate,
     CalibrationPointResponse,
+    Device,
     Reading,
     ReadingResponse,
     Tilt,
@@ -21,6 +25,7 @@ from ..models import (
 from ..services.calibration import calibration_service
 from ..state import latest_readings
 from ..websocket import manager
+from ..device_utils import create_tilt_device_record
 
 router = APIRouter(prefix="/api/tilts", tags=["tilts"])
 
@@ -201,8 +206,30 @@ async def pair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     if not tilt:
         raise HTTPException(status_code=404, detail="Tilt not found")
 
+    paired_at = datetime.now(timezone.utc)
+
+    # Update legacy Tilt table
     tilt.paired = True
-    tilt.paired_at = datetime.now(timezone.utc)
+    tilt.paired_at = paired_at
+
+    # Also update Device table for universal device support
+    device = await db.get(Device, tilt_id)
+    if device:
+        device.paired = True
+        device.paired_at = paired_at
+    else:
+        # Create missing Device record to maintain data consistency
+        logger.info(f"Creating Device record for Tilt {tilt_id} during pairing")
+        device = create_tilt_device_record(
+            device_id=tilt_id,
+            color=tilt.color,
+            mac=tilt.mac,
+            last_seen=tilt.last_seen,
+            paired=True,
+            paired_at=paired_at,
+        )
+        db.add(device)
+
     await db.commit()
     await db.refresh(tilt)
 
@@ -221,8 +248,29 @@ async def unpair_tilt(tilt_id: str, db: AsyncSession = Depends(get_db)):
     if not tilt:
         raise HTTPException(status_code=404, detail="Tilt not found")
 
+    # Update legacy Tilt table
     tilt.paired = False
     tilt.paired_at = None
+
+    # Also update Device table for universal device support
+    # Create Device record if missing to maintain data consistency between tables
+    device = await db.get(Device, tilt_id)
+    if device:
+        device.paired = False
+        device.paired_at = None
+    else:
+        # Create missing Device record to maintain data consistency
+        logger.info(f"Creating Device record for Tilt {tilt_id} during unpairing")
+        device = create_tilt_device_record(
+            device_id=tilt_id,
+            color=tilt.color,
+            mac=tilt.mac,
+            last_seen=tilt.last_seen,
+            paired=False,
+            paired_at=None,
+        )
+        db.add(device)
+
     await db.commit()
     await db.refresh(tilt)
 

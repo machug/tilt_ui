@@ -64,6 +64,30 @@
 		return `${days}d ago`;
 	}
 
+	function getDeviceDisplayName(device: DeviceResponse): string {
+		if (device.display_name) return device.display_name;
+		if (device.device_type === 'tilt' && device.color) {
+			return `${device.color} Tilt`;
+		}
+		if (device.device_type === 'ispindel') {
+			return `iSpindel ${device.name}`;
+		}
+		if (device.device_type === 'gravitymon') {
+			return `GravityMon ${device.name}`;
+		}
+		return device.name;
+	}
+
+	function getDeviceTypeLabel(deviceType: string): string {
+		const labels: Record<string, string> = {
+			tilt: 'Tilt',
+			ispindel: 'iSpindel',
+			gravitymon: 'GravityMon',
+			floaty: 'Floaty'
+		};
+		return labels[deviceType] || deviceType;
+	}
+
 	let pairedDevices = $derived(devices.filter(d => d.paired));
 	let unpairedDevices = $derived(devices.filter(d => !d.paired));
 </script>
@@ -74,7 +98,7 @@
 
 <div class="page-header">
 	<h1 class="page-title">Devices</h1>
-	<p class="page-description">Manage your Tilt hydrometer devices</p>
+	<p class="page-description">Manage your hydrometer devices (Tilt, iSpindel, GravityMon)</p>
 </div>
 
 {#if loading}
@@ -101,9 +125,15 @@
 						<div class="device-card paired">
 							<div class="device-header">
 								<div class="device-info">
-									<div class="device-color-badge" style="background: var(--tilt-{device.color.toLowerCase()})"></div>
+									{#if device.device_type === 'tilt' && device.color}
+										<div class="device-color-badge" style="background: var(--tilt-{device.color.toLowerCase()})"></div>
+									{:else}
+										<div class="device-type-badge">
+											<span class="device-type-label">{getDeviceTypeLabel(device.device_type)}</span>
+										</div>
+									{/if}
 									<div>
-										<h3 class="device-name">{device.color} Tilt</h3>
+										<h3 class="device-name">{getDeviceDisplayName(device)}</h3>
 										<p class="device-id">{device.id}</p>
 									</div>
 								</div>
@@ -114,18 +144,32 @@
 							</div>
 
 							<div class="device-details">
-								<div class="detail-row">
-									<span class="detail-label">Beer Name:</span>
-									<span class="detail-value">{device.beer_name}</span>
-								</div>
+								{#if device.beer_name}
+									<div class="detail-row">
+										<span class="detail-label">Beer Name:</span>
+										<span class="detail-value">{device.beer_name}</span>
+									</div>
+								{/if}
 								<div class="detail-row">
 									<span class="detail-label">Last Seen:</span>
 									<span class="detail-value">{timeSince(device.last_seen)}</span>
 								</div>
-								{#if device.mac}
+								{#if device.device_type === 'tilt' && device.mac}
 									<div class="detail-row">
 										<span class="detail-label">MAC:</span>
 										<span class="detail-value mono">{device.mac}</span>
+									</div>
+								{/if}
+								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && Number.isFinite(device.battery_voltage)}
+									<div class="detail-row">
+										<span class="detail-label">Battery:</span>
+										<span class="detail-value">{device.battery_voltage.toFixed(2)}V</span>
+									</div>
+								{/if}
+								{#if device.firmware_version}
+									<div class="detail-row">
+										<span class="detail-label">Firmware:</span>
+										<span class="detail-value">{device.firmware_version}</span>
 									</div>
 								{/if}
 							</div>
@@ -149,7 +193,7 @@
 
 			{#if unpairedDevices.length === 0}
 				<div class="empty-state">
-					<p>No unpaired devices detected. Make sure your Tilt is floating and within Bluetooth range.</p>
+					<p>No unpaired devices detected. Make sure your devices are broadcasting and within range.</p>
 				</div>
 			{:else}
 				<div class="device-grid">
@@ -157,9 +201,15 @@
 						<div class="device-card unpaired">
 							<div class="device-header">
 								<div class="device-info">
-									<div class="device-color-badge" style="background: var(--tilt-{device.color.toLowerCase()})"></div>
+									{#if device.device_type === 'tilt' && device.color}
+										<div class="device-color-badge" style="background: var(--tilt-{device.color.toLowerCase()})"></div>
+									{:else}
+										<div class="device-type-badge">
+											<span class="device-type-label">{getDeviceTypeLabel(device.device_type)}</span>
+										</div>
+									{/if}
 									<div>
-										<h3 class="device-name">{device.color} Tilt</h3>
+										<h3 class="device-name">{getDeviceDisplayName(device)}</h3>
 										<p class="device-id">{device.id}</p>
 									</div>
 								</div>
@@ -174,10 +224,22 @@
 									<span class="detail-label">Last Seen:</span>
 									<span class="detail-value">{timeSince(device.last_seen)}</span>
 								</div>
-								{#if device.mac}
+								{#if device.device_type === 'tilt' && device.mac}
 									<div class="detail-row">
 										<span class="detail-label">MAC:</span>
 										<span class="detail-value mono">{device.mac}</span>
+									</div>
+								{/if}
+								{#if (device.device_type === 'ispindel' || device.device_type === 'gravitymon') && Number.isFinite(device.battery_voltage)}
+									<div class="detail-row">
+										<span class="detail-label">Battery:</span>
+										<span class="detail-value">{device.battery_voltage.toFixed(2)}V</span>
+									</div>
+								{/if}
+								{#if device.firmware_version}
+									<div class="detail-row">
+										<span class="detail-label">Firmware:</span>
+										<span class="detail-value">{device.firmware_version}</span>
 									</div>
 								{/if}
 							</div>
@@ -283,6 +345,27 @@
 		height: 2.5rem;
 		border-radius: 0.375rem;
 		flex-shrink: 0;
+	}
+
+	.device-type-badge {
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.375rem;
+		flex-shrink: 0;
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.device-type-label {
+		font-size: 0.625rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		text-align: center;
+		line-height: 1.1;
 	}
 
 	.device-name {

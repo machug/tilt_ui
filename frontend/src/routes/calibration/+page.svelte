@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { configState, formatTemp, getTempUnit } from '$lib/stores/config.svelte';
 
-	interface Tilt {
+	interface Device {
 		id: string;
 		color: string;
 		beer_name: string;
@@ -17,8 +17,8 @@
 		actual_value: number;
 	}
 
-	let tilts = $state<Tilt[]>([]);
-	let selectedTiltId = $state<string | null>(null);
+	let devices = $state<Device[]>([]);
+	let selectedDeviceId = $state<string | null>(null);
 	let calibrationPoints = $state<CalibrationPoint[]>([]);
 	let loading = $state(true);
 	let loadingPoints = $state(false);
@@ -38,30 +38,30 @@
 	let sgPoints = $derived(calibrationPoints.filter((p) => p.type === 'sg').sort((a, b) => a.raw_value - b.raw_value));
 	let tempPoints = $derived(calibrationPoints.filter((p) => p.type === 'temp').sort((a, b) => a.raw_value - b.raw_value));
 
-	// Selected tilt object
-	let selectedTilt = $derived(tilts.find((t) => t.id === selectedTiltId));
+	// Selected device object
+	let selectedDevice = $derived(devices.find((d) => d.id === selectedDeviceId));
 
-	async function loadTilts() {
+	async function loadDevices() {
 		try {
-			const response = await fetch('/api/tilts');
+			const response = await fetch('/api/devices?paired_only=true');
 			if (response.ok) {
-				tilts = await response.json();
-				if (tilts.length > 0 && !selectedTiltId) {
-					selectedTiltId = tilts[0].id;
+				devices = await response.json();
+				if (devices.length > 0 && !selectedDeviceId) {
+					selectedDeviceId = devices[0].id;
 				}
 			}
 		} catch (e) {
-			console.error('Failed to load tilts:', e);
+			console.error('Failed to load devices:', e);
 		} finally {
 			loading = false;
 		}
 	}
 
 	async function loadCalibrationPoints() {
-		if (!selectedTiltId) return;
+		if (!selectedDeviceId) return;
 		loadingPoints = true;
 		try {
-			const response = await fetch(`/api/tilts/${selectedTiltId}/calibration`);
+			const response = await fetch(`/api/devices/${selectedDeviceId}/calibration`);
 			if (response.ok) {
 				calibrationPoints = await response.json();
 			}
@@ -73,7 +73,7 @@
 	}
 
 	async function addCalibrationPoint(type: 'sg' | 'temp', rawValue: string, actualValue: string) {
-		if (!selectedTiltId) return;
+		if (!selectedDeviceId) return;
 
 		const raw = parseFloat(rawValue);
 		const actual = parseFloat(actualValue);
@@ -84,7 +84,7 @@
 
 		saving = true;
 		try {
-			const response = await fetch(`/api/tilts/${selectedTiltId}/calibration`, {
+			const response = await fetch(`/api/devices/${selectedDeviceId}/calibration`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -113,7 +113,7 @@
 	}
 
 	async function clearCalibration(type: 'sg' | 'temp') {
-		if (!selectedTiltId) return;
+		if (!selectedDeviceId) return;
 
 		if (!confirm(`Clear all ${type === 'sg' ? 'gravity' : 'temperature'} calibration points?`)) {
 			return;
@@ -121,7 +121,7 @@
 
 		saving = true;
 		try {
-			const response = await fetch(`/api/tilts/${selectedTiltId}/calibration/${type}`, {
+			const response = await fetch(`/api/devices/${selectedDeviceId}/calibration/${type}`, {
 				method: 'DELETE'
 			});
 
@@ -148,12 +148,12 @@
 	}
 
 	onMount(() => {
-		loadTilts();
+		loadDevices();
 	});
 
-	// Load calibration when tilt changes
+	// Load calibration when device changes
 	$effect(() => {
-		if (selectedTiltId) {
+		if (selectedDeviceId) {
 			loadCalibrationPoints();
 		}
 	});
@@ -172,39 +172,39 @@
 	{#if loading}
 		<div class="loading-state">
 			<div class="loading-spinner"></div>
-			<span>Loading Tilts...</span>
+			<span>Loading Devices...</span>
 		</div>
-	{:else if tilts.length === 0}
+	{:else if devices.length === 0}
 		<div class="empty-state">
 			<div class="empty-icon">📊</div>
-			<h3 class="empty-title">No Tilts Found</h3>
+			<h3 class="empty-title">No Devices Found</h3>
 			<p class="empty-description">
-				Connect a Tilt hydrometer to start calibrating.
-				Tilts will appear here once detected.
+				Pair a device to start calibrating.
+				Devices will appear here once paired.
 			</p>
 		</div>
 	{:else}
-		<!-- Tilt Selector -->
+		<!-- Device Selector -->
 		<div class="card mb-6">
 			<div class="card-header">
-				<h2 class="card-title">Select Tilt</h2>
+				<h2 class="card-title">Select Device</h2>
 			</div>
 			<div class="card-body">
 				<div class="tilt-selector">
 					<select
-						bind:value={selectedTiltId}
+						bind:value={selectedDeviceId}
 						class="select-input"
 					>
-						{#each tilts as tilt}
-							<option value={tilt.id}>
-								{tilt.color} — {tilt.beer_name}
+						{#each devices as device}
+							<option value={device.id}>
+								{device.color} — {device.beer_name}
 							</option>
 						{/each}
 					</select>
-					{#if selectedTilt}
+					{#if selectedDevice}
 						<div class="tilt-info">
-							<span class="tilt-color-dot" style="background: var(--tilt-{selectedTilt.color.toLowerCase()});"></span>
-							<span class="font-mono text-xs text-[var(--text-muted)]">{selectedTilt.id}</span>
+							<span class="tilt-color-dot" style="background: var(--tilt-{selectedDevice.color.toLowerCase()});"></span>
+							<span class="font-mono text-xs text-[var(--text-muted)]">{selectedDevice.id}</span>
 						</div>
 					{/if}
 				</div>

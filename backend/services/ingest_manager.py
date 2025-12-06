@@ -229,16 +229,6 @@ class IngestManager:
             is_pre_filtered=reading.is_pre_filtered,
         )
 
-        # Also set tilt_id for backwards compatibility if this is a Tilt
-        if reading.device_type == "tilt":
-            # Check if tilt exists in legacy table
-            from sqlalchemy import select
-            from ..models import Tilt
-            result = await db.execute(select(Tilt).where(Tilt.id == reading.device_id))
-            tilt = result.scalar_one_or_none()
-            if tilt:
-                db_reading.tilt_id = tilt.id
-
         db.add(db_reading)
         await db.flush()
 

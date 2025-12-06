@@ -37,7 +37,7 @@ async def test_reading_batch_relationship(test_db):
 
     # Create a reading without batch_id
     reading = Reading(
-        tilt_id=None,
+        device_id=None,
         sg_raw=1.050,
         temp_raw=68.0,
         batch_id=None  # Should be allowed

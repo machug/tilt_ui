@@ -143,3 +143,128 @@ async def test_unpair_tilt_mid_batch(client: AsyncClient, test_db: AsyncSession)
     # Verify batch is still active (unpairing doesn't affect batch status)
     await test_db.refresh(batch)
     assert batch.status == "fermenting"
+
+
+@pytest.mark.asyncio
+async def test_pair_tilt_creates_device_record(client: AsyncClient, test_db: AsyncSession):
+    """Test that pairing a Tilt creates a Device record if missing."""
+    # Create Tilt without Device record
+    tilt = Tilt(id="RED", color="RED", paired=False)
+    test_db.add(tilt)
+    await test_db.commit()
+
+    # Verify Device doesn't exist yet
+    device = await test_db.get(Device, "RED")
+    assert device is None
+
+    # Pair the tilt
+    response = await client.post("/api/tilts/RED/pair")
+    assert response.status_code == 200
+
+    # Verify Device record was created with correct attributes
+    device = await test_db.get(Device, "RED")
+    assert device is not None
+    assert device.paired is True
+    assert device.paired_at is not None
+    assert device.device_type == "tilt"
+    assert device.name == "RED"
+    assert device.color == "RED"
+
+    # Verify Tilt was also updated
+    await test_db.refresh(tilt)
+    assert tilt.paired is True
+    assert tilt.paired_at is not None
+
+
+@pytest.mark.asyncio
+async def test_unpair_tilt_creates_device_record(client: AsyncClient, test_db: AsyncSession):
+    """Test that unpairing a Tilt creates a Device record if missing."""
+    # Create paired Tilt without Device record
+    tilt = Tilt(id="BLUE", color="BLUE", paired=True)
+    test_db.add(tilt)
+    await test_db.commit()
+
+    # Verify Device doesn't exist yet
+    device = await test_db.get(Device, "BLUE")
+    assert device is None
+
+    # Unpair the tilt
+    response = await client.post("/api/tilts/BLUE/unpair")
+    assert response.status_code == 200
+
+    # Verify Device record was created with correct attributes
+    device = await test_db.get(Device, "BLUE")
+    assert device is not None
+    assert device.paired is False
+    assert device.paired_at is None
+    assert device.device_type == "tilt"
+    assert device.name == "BLUE"
+    assert device.color == "BLUE"
+
+    # Verify Tilt was also updated
+    await test_db.refresh(tilt)
+    assert tilt.paired is False
+    assert tilt.paired_at is None
+
+
+@pytest.mark.asyncio
+async def test_pair_tilt_updates_both_tables(client: AsyncClient, test_db: AsyncSession):
+    """Test that pairing updates both Tilt and Device tables."""
+    # Create both Tilt and Device records (unpaired)
+    tilt = Tilt(id="GREEN", color="GREEN", paired=False)
+    device = Device(
+        id="GREEN",
+        device_type="tilt",
+        name="GREEN",
+        color="GREEN",
+        paired=False
+    )
+    test_db.add(tilt)
+    test_db.add(device)
+    await test_db.commit()
+
+    # Pair the tilt
+    response = await client.post("/api/tilts/GREEN/pair")
+    assert response.status_code == 200
+
+    # Verify both tables were updated
+    await test_db.refresh(tilt)
+    await test_db.refresh(device)
+
+    assert tilt.paired is True
+    assert tilt.paired_at is not None
+    assert device.paired is True
+    assert device.paired_at is not None
+
+    # Verify timestamps match
+    assert tilt.paired_at == device.paired_at
+
+
+@pytest.mark.asyncio
+async def test_unpair_tilt_updates_both_tables(client: AsyncClient, test_db: AsyncSession):
+    """Test that unpairing updates both Tilt and Device tables."""
+    # Create both Tilt and Device records (paired)
+    tilt = Tilt(id="YELLOW", color="YELLOW", paired=True)
+    device = Device(
+        id="YELLOW",
+        device_type="tilt",
+        name="YELLOW",
+        color="YELLOW",
+        paired=True
+    )
+    test_db.add(tilt)
+    test_db.add(device)
+    await test_db.commit()
+
+    # Unpair the tilt
+    response = await client.post("/api/tilts/YELLOW/unpair")
+    assert response.status_code == 200
+
+    # Verify both tables were updated
+    await test_db.refresh(tilt)
+    await test_db.refresh(device)
+
+    assert tilt.paired is False
+    assert tilt.paired_at is None
+    assert device.paired is False
+    assert device.paired_at is None
